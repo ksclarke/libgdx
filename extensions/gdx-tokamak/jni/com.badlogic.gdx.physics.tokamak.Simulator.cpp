@@ -1,12 +1,12 @@
 #include <com.badlogic.gdx.physics.tokamak.Simulator.h>
 
-//@line:21
+//@line:37
 
 	#include <tokamak.h>
 	 JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_createSimulator(JNIEnv* env, jclass clazz, jint animatedBodiesCount, jint constraintBufferSize, jint constraintsCount, jint constraintSetsCount, jint controllersCount, jint geometriesCount, jint overlappedPairsCount, jint rigidBodiesCount, jint rigidParticleCount, jint sensorsCount, jint terrainNodesGrowByCount, jint terrainNodesStartCount, jfloat x, jfloat y, jfloat z) {
 
 
-//@line:52
+//@line:68
 
 		neSimulatorSizeInfo sizeInfo;
 		sizeInfo.animatedBodiesCount = animatedBodiesCount;
@@ -33,7 +33,7 @@
 JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_disposeJni(JNIEnv* env, jclass clazz, jlong addr) {
 
 
-//@line:78
+//@line:94
 
 		neSimulator::DestroySimulator((neSimulator*)addr);
 	
@@ -43,7 +43,7 @@ JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_disposeJn
 JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_createRigidBodyJni(JNIEnv* env, jclass clazz, jlong addr) {
 
 
-//@line:88
+//@line:104
 
 		return (jlong)((neSimulator*)addr)->CreateRigidBody();
 	
@@ -53,7 +53,7 @@ JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_createRi
 JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_createRigidParticleJni(JNIEnv* env, jclass clazz, jlong addr) {
 
 
-//@line:98
+//@line:114
 
 		return (jlong)((neSimulator*)addr)->CreateRigidParticle();
 	
@@ -63,7 +63,7 @@ JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_createRi
 JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_createAnimatedBodyJni(JNIEnv* env, jclass clazz, jlong addr) {
 
 
-//@line:108
+//@line:124
 
 		return (jlong)((neSimulator*)addr)->CreateAnimatedBody();
 	
@@ -73,7 +73,7 @@ JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_createAn
 JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_freeRigidBodyJni(JNIEnv* env, jclass clazz, jlong simAddr, jlong addr) {
 
 
-//@line:116
+//@line:132
 
 		((neSimulator*)simAddr)->FreeRigidBody((neRigidBody*)addr);
 	
@@ -83,7 +83,7 @@ JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_freeRigid
 JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_freeAnimatedBodyJni(JNIEnv* env, jclass clazz, jlong simAddr, jlong addr) {
 
 
-//@line:124
+//@line:140
 
 		((neSimulator*)simAddr)->FreeAnimatedBody((neAnimatedBody*)addr);
 	
@@ -93,7 +93,7 @@ JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_freeAnima
 JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_getCollisionTableJNI(JNIEnv* env, jclass clazz, jlong addr) {
 
 
-//@line:133
+//@line:149
 
 		return (jlong)((neSimulator*)addr)->GetCollisionTable();
 	
@@ -103,7 +103,7 @@ JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_getColli
 JNIEXPORT jboolean JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_setMaterialJni(JNIEnv* env, jclass clazz, jlong addr, jint index, jfloat friction, jfloat restitution) {
 
 
-//@line:145
+//@line:161
 
 		((neSimulator*)addr)->SetMaterial(index, friction, restitution);
 	
@@ -113,7 +113,7 @@ JNIEXPORT jboolean JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_setMa
 static inline jboolean wrapped_Java_com_badlogic_gdx_physics_tokamak_Simulator_getMaterialJni
 (JNIEnv* env, jclass clazz, jlong addr, jint index, jfloatArray obj_materialTmp, float* materialTmp) {
 
-//@line:156
+//@line:172
 
 		return ((neSimulator*)addr)->GetMaterial(index, materialTmp[0], materialTmp[1]);
 	
@@ -132,7 +132,7 @@ JNIEXPORT jboolean JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_getMa
 JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_advanceJni__JFI(JNIEnv* env, jclass clazz, jlong addr, jfloat sec, jint nSteps) {
 
 
-//@line:164
+//@line:180
 
 		((neSimulator*)addr)->Advance(sec, nSteps);
 	
@@ -142,7 +142,7 @@ JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_advanceJn
 JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_advanceJni__JFFF(JNIEnv* env, jclass clazz, jlong addr, jfloat sec, jfloat minTimeStep, jfloat maxTimeStep) {
 
 
-//@line:172
+//@line:188
 
 		((neSimulator*)addr)->Advance(sec, minTimeStep, maxTimeStep);
 	
@@ -152,7 +152,7 @@ JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_advanceJn
 JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_createJointJni__JJ(JNIEnv* env, jclass clazz, jlong addr, jlong addrBody) {
 
 
-//@line:190
+//@line:206
 
 		return (jlong)((neSimulator*)addr)->CreateJoint((neRigidBody*)addrBody);
 	
@@ -162,7 +162,7 @@ JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_createJo
 JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_createJointJni__JJJ(JNIEnv* env, jclass clazz, jlong addr, jlong addrBodyA, jlong addrBodyB) {
 
 
-//@line:200
+//@line:216
 
 		return (jlong)((neSimulator*)addr)->CreateJoint((neRigidBody*)addrBodyA, (neRigidBody*)addrBodyB);
 	
@@ -172,7 +172,7 @@ JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_createJo
 JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_createJointAnimatedBodyJni(JNIEnv* env, jclass clazz, jlong addr, jlong addrBodyA, jlong addrBodyB) {
 
 
-//@line:210
+//@line:226
 
 		return (jlong)((neSimulator*)addr)->CreateJoint((neRigidBody*)addrBodyA, (neAnimatedBody*)addrBodyB);
 	
@@ -182,7 +182,7 @@ JNIEXPORT jlong JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_createJo
 JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_freeJointJni(JNIEnv* env, jclass clazz, jlong addr, jlong addrJoint) {
 
 
-//@line:218
+//@line:234
 
 		((neSimulator*)addr)->FreeJoint((neJoint*)addrJoint);
 	
@@ -193,7 +193,7 @@ JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_getGravit
 	float* gravity = (float*)env->GetPrimitiveArrayCritical(obj_gravity, 0);
 
 
-//@line:230
+//@line:246
 
 		neV3 vec;
 		vec = ((neSimulator*)addr)->Gravity();
@@ -208,7 +208,7 @@ JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_getGravit
 JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_setGravityJni(JNIEnv* env, jclass clazz, jlong addr, jfloat x, jfloat y, jfloat z) {
 
 
-//@line:246
+//@line:262
 
 		neV3 vec;
 		vec.Set(x, y, z);
@@ -220,7 +220,7 @@ JNIEXPORT void JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_setGravit
 JNIEXPORT jint JNICALL Java_com_badlogic_gdx_physics_tokamak_Simulator_getMemoryAllocatedJni(JNIEnv* env, jclass clazz, jlong addr) {
 
 
-//@line:292
+//@line:308
 
 		s32 memory;
 		((neSimulator*)addr)->GetMemoryAllocated(memory);
