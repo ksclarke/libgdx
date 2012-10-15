@@ -24,7 +24,8 @@ public class Touchpad extends Widget {
 	private TouchpadStyle style;
 	boolean touched;
 	private float deadzoneRadius;
-	private final Circle padBounds = new Circle(0, 0, 0);
+	private final Circle knobBounds = new Circle(0, 0, 0);
+	private final Circle touchBounds = new Circle(0, 0, 0);
 	private final Circle deadzoneBounds = new Circle(0, 0, 0);
 	private final Vector2 knobPosition = new Vector2();
 	private final Vector2 knobPercent = new Vector2();
@@ -77,15 +78,19 @@ public class Touchpad extends Widget {
 		float oldPositionY = knobPosition.y;
 		float oldPercentX = knobPercent.x;
 		float oldPercentY = knobPercent.y;
-		knobPosition.set(getWidth() / 2f, getHeight() / 2f);
+		float centerX = knobBounds.x;
+		float centerY = knobBounds.y;
+		knobPosition.set(centerX, centerY);
 		knobPercent.set(0f, 0f);
 		if (!isTouchUp) {
 			if (!deadzoneBounds.contains(x, y)) {
-				knobPercent.set(x - padBounds.x, y - padBounds.y).nor();
-				if (padBounds.contains(x, y)) {
+				knobPercent.set((x - centerX) / knobBounds.radius, (y - centerY) / knobBounds.radius);
+				float length = knobPercent.len();
+				if (length > 1) knobPercent.mul(1 / length);
+				if (knobBounds.contains(x, y)) {
 					knobPosition.set(x, y);
 				} else {
-					knobPosition.set(knobPercent).mul(padBounds.radius).add(padBounds.x, padBounds.y);
+					knobPosition.set(knobPercent).nor().mul(knobBounds.radius).add(knobBounds.x, knobBounds.y);
 				}
 			}
 		}
@@ -113,18 +118,21 @@ public class Touchpad extends Widget {
 
 	@Override
 	public Actor hit (float x, float y, boolean touchable) {
-		return padBounds.contains(x, y) ? this : null;
+		return touchBounds.contains(x, y) ? this : null;
 	}
 
 	@Override
 	public void layout () {
 		// Recalc pad and deadzone bounds
-		float radius = Math.min(getWidth(), getHeight()) / 2;
+		float halfWidth = getWidth() / 2;
+		float halfHeight = getHeight() / 2;
+		float radius = Math.min(halfWidth, halfHeight);
+		touchBounds.set(halfWidth, halfHeight, radius);
 		if (style.knob != null) radius -= Math.max(style.knob.getMinWidth(), style.knob.getMinHeight()) / 2;
-		padBounds.set(getWidth() / 2f, getHeight() / 2f, radius);
-		deadzoneBounds.set(getWidth() / 2f, getHeight() / 2f, deadzoneRadius);
+		knobBounds.set(halfWidth, halfHeight, radius);
+		deadzoneBounds.set(halfWidth, halfHeight, deadzoneRadius);
 		// Recalc pad values and knob position
-		knobPosition.set(getWidth() / 2f, getHeight() / 2f);
+		knobPosition.set(halfWidth, halfHeight);
 		knobPercent.set(0, 0);
 	}
 

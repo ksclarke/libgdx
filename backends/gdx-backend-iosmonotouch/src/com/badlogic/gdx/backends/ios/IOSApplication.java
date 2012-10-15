@@ -18,7 +18,11 @@ package com.badlogic.gdx.backends.ios;
 import cli.MonoTouch.Foundation.NSDictionary;
 import cli.MonoTouch.UIKit.UIApplication;
 import cli.MonoTouch.UIKit.UIApplicationDelegate;
+import cli.MonoTouch.UIKit.UIDevice;
+import cli.MonoTouch.UIKit.UIDeviceOrientation;
+import cli.MonoTouch.UIKit.UIInterfaceOrientation;
 import cli.MonoTouch.UIKit.UIScreen;
+import cli.MonoTouch.UIKit.UIViewController;
 import cli.MonoTouch.UIKit.UIWindow;
 import cli.System.Console;
 import cli.System.Drawing.RectangleF;
@@ -30,6 +34,7 @@ import com.badlogic.gdx.Files;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Graphics;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.Net;
 import com.badlogic.gdx.Preferences;
 import com.badlogic.gdx.utils.Clipboard;
 
@@ -42,46 +47,111 @@ public class IOSApplication extends UIApplicationDelegate implements Application
 	IOSAudio audio;
 	IOSFiles files;
 	IOSInput input;
+	IOSNet net;
 	int logLevel = Application.LOG_DEBUG;
 	boolean firstResume;
 	
 	/**
-	 * Should be called in AppDelegate#FinishedLaunching
-	 * @param uiApp
+	 * Should be called in AppDelegate#FinishedLaunching.
+	 * 
+	 * @param listener  Our application (aka game) to run.
+	 * @param config  The desired iOS configuration.
 	 */
 	public IOSApplication(ApplicationListener listener, IOSApplicationConfiguration config) {
 		this.listener = listener;
-		this.config = config;
+		this.config = config; 
 		Gdx.app = this;
 	}
 	
 	@Override
 	public boolean FinishedLaunching(UIApplication uiApp, NSDictionary options) {
 		this.uiApp = uiApp;
-		RectangleF bounds = UIScreen.get_MainScreen().get_Bounds();
+			
+		// Create: Window -> ViewController-> GameView (controller takes care of rotation)
+		this.uiWindow = new UIWindow(UIScreen.get_MainScreen().get_Bounds());	
+		UIViewController uiViewController = new UIViewController() {	
+			@Override
+			public void DidRotate (UIInterfaceOrientation orientation) {
+				// get the view size and update graphics
+				// FIXME: supporting BOTH (landscape+portrait at same time) is currently not working correctly (needs fix)
+				RectangleF bounds = getBounds(this);
+				graphics.width = (int)bounds.get_Width();
+				graphics.height = (int)bounds.get_Height();
+				graphics.MakeCurrent();  // not sure if that's needed?
+				listener.resize(graphics.width, graphics.height);
+			}
+			@Override
+			public boolean ShouldAutorotateToInterfaceOrientation (UIInterfaceOrientation orientation) {
+				// we return "true" if we support the orientation
+				switch (orientation.Value) { 
+					case UIInterfaceOrientation.LandscapeLeft: 
+					case UIInterfaceOrientation.LandscapeRight: 
+					   return config.orientationLandscape;
+					default: 
+						// assume portrait
+					   return config.orientationPortrait;
+				} 
+			}
+		};
+		this.uiWindow.set_RootViewController(uiViewController);
+
+		// setup libgdx
 		this.input = new IOSInput(config);
-		this.graphics = new IOSGraphics(bounds, this, input);
+		this.graphics = new IOSGraphics(getBounds(uiViewController), this, input);
 		this.files = new IOSFiles();
 		this.audio = new IOSAudio();
+		this.net = new IOSNet(this);
 		
 		Gdx.files = this.files;
 		Gdx.graphics = this.graphics;
 		Gdx.audio = this.audio;
 		Gdx.input = this.input;
+		Gdx.net = this.net;
 		
 		this.input.setupPeripherals();
-		
-		this.uiWindow = new UIWindow(bounds);
-		this.uiWindow.Add(graphics);
+
+		// attach our view to window+controller and make it visible
+		uiViewController.set_View(graphics);
 		this.graphics.Run();
 		this.uiWindow.MakeKeyAndVisible();
-		Gdx.app.log("IOSApplication", "created");
+		Gdx.app.debug("IOSApplication", "created");
 		return true;
 	}
 
+	/**
+	 * Returns our real display dimension based on screen orientation.
+	 * 
+	 * @param viewController  The view controller.
+	 * @return  Or real display dimension.
+	 */
+	RectangleF getBounds(UIViewController viewController) {
+		// or screen size (always portrait)
+		RectangleF bounds = UIScreen.get_MainScreen().get_Bounds();
+
+		// determine orientation and resulting width + height
+		UIInterfaceOrientation orientation = viewController.get_InterfaceOrientation();
+		int width;
+		int height;
+		switch (orientation.Value) { 
+			case UIInterfaceOrientation.LandscapeLeft: 
+			case UIInterfaceOrientation.LandscapeRight: 
+			   height = (int)bounds.get_Width();
+			   width = (int)bounds.get_Height();
+			   break;
+			default: 
+				// assume portrait
+				width = (int)bounds.get_Width();
+			   height = (int)bounds.get_Height();
+		} 
+		Gdx.app.debug("IOSApplication", "View: " + orientation.toString() + " " + width + "x" + height);
+		
+		// return resulting view size (based on orientation)
+		return new RectangleF(0, 0, width, height);
+	}
+	
 	@Override
 	public void OnActivated(UIApplication uiApp) {
-		Gdx.app.log("IOSApplication", "resumed");
+		Gdx.app.debug("IOSApplication", "resumed");
 		if(!firstResume) {
 			graphics.MakeCurrent();
 			listener.resume();
@@ -91,7 +161,7 @@ public class IOSApplication extends UIApplicationDelegate implements Application
 
 	@Override
 	public void OnResignActivation(UIApplication uiApp) {
-		Gdx.app.log("IOSApplication", "paused");
+		Gdx.app.debug("IOSApplication", "paused");
 		graphics.MakeCurrent();
 		listener.pause();
 		Gdx.gl.glFlush();
@@ -99,7 +169,7 @@ public class IOSApplication extends UIApplicationDelegate implements Application
 
 	@Override
 	public void WillTerminate(UIApplication uiApp) {
-		Gdx.app.log("IOSApplication", "disposed");
+		Gdx.app.debug("IOSApplication", "disposed");
 		graphics.MakeCurrent();
 		listener.dispose();
 		Gdx.gl.glFlush();
@@ -123,6 +193,11 @@ public class IOSApplication extends UIApplicationDelegate implements Application
 	@Override
 	public Files getFiles () {
 		return files;
+	}
+	
+	@Override
+	public Net getNet() {
+		return net;
 	}
 
 	@Override
@@ -197,7 +272,7 @@ public class IOSApplication extends UIApplicationDelegate implements Application
 
 	@Override
 	public Preferences getPreferences (String name) {
-		return null;
+		return new IOSPreferences();
 	}
 
 	@Override

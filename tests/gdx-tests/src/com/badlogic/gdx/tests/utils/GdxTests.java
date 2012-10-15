@@ -48,7 +48,7 @@ public class GdxTests {
 		BobTest.class, ImageScaleTest.class, TableLayoutTest.class, Box2DTest.class, InterpolationTest.class, TouchpadTest.class,
 		Box2DTestCollection.class, BufferUtilsTest.class, ImageTest.class, CompassTest.class, ComplexActionTest.class,
 		CullTest.class, DeltaTimeTest.class, EdgeDetectionTest.class, ETC1Test.class, ExitTest.class, FilesTest.class,
-		ScrollPaneTest.class, FloatTest.class, FrameBufferTest.class, FramebufferToTextureTest.class, FrustumTest.class,
+		ScrollPaneTest.class, FloatTest.class, FloatTextureTest.class, FrameBufferTest.class, FramebufferToTextureTest.class, FrustumTest.class,
 		FullscreenTest.class, Gdx2DTest.class, GroupFadeTest.class, ImmediateModeRendererTest.class, Scene2dTest.class,
 		ImmediateModeRendererAlphaTest.class, IndexBufferObjectClassTest.class, TreeTest.class, IndexBufferObjectShaderTest.class,
 		InputTest.class, IntegerBitmapFontTest.class, InverseKinematicsTest.class, IsoCamTest.class, IsometricTileTest.class,
@@ -65,11 +65,13 @@ public class GdxTests {
 		TextureDownloadTest.class, TextureFormatTest.class, TextureAtlasTest.class, TextInputDialogTest.class,
 		TextureRenderTest.class, TiledMapTest.class, TileTest.class, UITest.class, VBOVATest.class, VertexArrayTest.class,
 		VertexBufferObjectTest.class, VertexArrayClassTest.class, VertexBufferObjectClassTest.class, LetterBoxTest2.class,
-		VertexBufferObjectShaderTest.class, VibratorTest.class, VorbisTest.class, WaterRipples.class, HelloTriangle.class,
-		SimpleVertexShader.class, ShapeRendererTest.class, MoveSpriteExample.class, SoundTouchTest.class, Mpg123Test.class,
-		WavTest.class, TextButtonTest.class, TextButtonTestGL2.class, TextureBindTest.class, SortedSpriteTest.class,
-		ExternalMusicTest.class, SoftKeyboardTest.class, DirtyRenderingTest.class, FreeTypeTest.class, YDownTest.class,
-		ScreenCaptureTest.class, InternationalFontsTest.class, BitmapFontTest.class, LabelScaleTest.class};
+		VertexBufferObjectShaderTest.class, VibratorTest.class, WaterRipples.class, HelloTriangle.class,
+		SimpleVertexShader.class, ShapeRendererTest.class, MoveSpriteExample.class, 
+		// SoundTouchTest.class, Mpg123Test.class, WavTest.class, FreeTypeTest.class,
+		// InternationalFontsTest.class, VorbisTest.class
+		TextButtonTest.class, TextButtonTestGL2.class, TextureBindTest.class, SortedSpriteTest.class,
+		ExternalMusicTest.class, SoftKeyboardTest.class, DirtyRenderingTest.class, YDownTest.class,
+		ScreenCaptureTest.class, BitmapFontTest.class, LabelScaleTest.class};
 
 	public static String[] getNames () {
 		List<String> names = new ArrayList<String>();

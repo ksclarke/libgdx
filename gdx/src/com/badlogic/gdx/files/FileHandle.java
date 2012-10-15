@@ -16,6 +16,11 @@
 
 package com.badlogic.gdx.files;
 
+import com.badlogic.gdx.Files;
+import com.badlogic.gdx.Files.FileType;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.utils.GdxRuntimeException;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
@@ -29,11 +34,6 @@ import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
-
-import com.badlogic.gdx.Files;
-import com.badlogic.gdx.Files.FileType;
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.utils.GdxRuntimeException;
 
 /** Represents a file or directory on the filesystem, classpath, Android SD card, or Android assets directory. FileHandles are
  * created via a {@link Files} instance.
@@ -223,10 +223,13 @@ public class FileHandle {
 				if (count == -1) break;
 				position += count;
 				if (position == buffer.length) {
+					int b = input.read();
+					if (b == -1) break;
 					// Grow buffer.
 					byte[] newBuffer = new byte[buffer.length * 2];
 					System.arraycopy(buffer, 0, newBuffer, 0, position);
 					buffer = newBuffer;
+					buffer[position++] = (byte)b;
 				}
 			}
 		} catch (IOException ex) {

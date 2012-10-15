@@ -10,7 +10,7 @@
 	<!-- the jni header jniPlatform to use -->
 	<property name="jniPlatform" value="win32"/>
 	<!-- the compilerPrefix for the C & C++ compilers -->
-	<property name="compilerPrefix" value="i586-mingw32msvc-"/>	
+	<property name="compilerPrefix" value="i686-w64-mingw32-"/>	
 	
 	<!-- define gcc compiler, options and files to compile -->
 	<property name="gcc" value="${compilerPrefix}gcc"/>	
@@ -36,7 +36,7 @@
 
 	<!-- define linker and options -->
 	<property name="linker" value="${compilerPrefix}g++"/>
-	<property name="linker-opts" value="-Wl,--kill-at -shared -m32"/>
+	<property name="linker-opts" value="-Wl,--kill-at -shared -m32 -static-libgcc -static-libstdc++"/>
 	
 	<!-- cleans the build directory, removes all object files and shared libs -->
 	<target name="clean">

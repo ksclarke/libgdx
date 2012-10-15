@@ -70,11 +70,10 @@ public class IOSInput implements Input {
 
 				@Override
 				public void DidAccelerate(UIAccelerometer accelerometer, UIAcceleration values) {
-					super.DidAccelerate(accelerometer, values);
+					//super.DidAccelerate(accelerometer, values);
 					acceleration[0] = (float)values.get_X();
 					acceleration[1] = (float)values.get_Y();
 					acceleration[2] = (float)values.get_Z();
-					Gdx.app.log("Input", "accel");
 				}
 			});
 			UIAccelerometer.get_SharedAccelerometer().set_UpdateInterval(config.accelerometerUpdate);
@@ -274,24 +273,22 @@ public class IOSInput implements Input {
 	void processEvents() {
 		synchronized(touchEvents) {
 			justTouched = false;
-			if(inputProcessor != null) {
-				for(TouchEvent event: touchEvents) {
-					currentEvent = event;
-					switch(event.phase) {
-					case UITouchPhase.Began:
-						inputProcessor.touchDown(event.x, event.y, event.pointer, Buttons.LEFT);
-						if(numTouched == 1)
-							justTouched = true;
-						break;
-					case UITouchPhase.Cancelled:
-					case UITouchPhase.Ended:
-						inputProcessor.touchUp(event.x, event.y, event.pointer, Buttons.LEFT);
-						break;
-					case UITouchPhase.Moved:
-					case UITouchPhase.Stationary:
-						inputProcessor.touchDragged(event.x, event.y, event.pointer);
-						break;
-					}
+			for(TouchEvent event: touchEvents) {
+				currentEvent = event;
+				switch(event.phase) {
+				case UITouchPhase.Began:
+					if(inputProcessor != null) inputProcessor.touchDown(event.x, event.y, event.pointer, Buttons.LEFT);
+					if(numTouched == 1)
+						justTouched = true;
+					break;
+				case UITouchPhase.Cancelled:
+				case UITouchPhase.Ended:
+					if(inputProcessor != null) inputProcessor.touchUp(event.x, event.y, event.pointer, Buttons.LEFT);
+					break;
+				case UITouchPhase.Moved:
+				case UITouchPhase.Stationary:
+					if(inputProcessor != null) inputProcessor.touchDragged(event.x, event.y, event.pointer);
+					break;
 				}
 			}
 			touchEventPool.free(touchEvents);

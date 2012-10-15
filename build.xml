@@ -30,10 +30,10 @@
 		</ant>
 	</target>
 	
-	<!-- gdx setup, custom target -->
+	<!-- gdx setup ui, custom target -->
 	<target name="gdx-setup-ui">
 		<ant antfile="build.xml" dir="extensions/gdx-setup-ui/"/>
-		<copy tofile="${distDir}/gdx-setup-ui.jar" file="extensions/gdx-setup-ui/libgdx-setup.jar"/>
+		<copy tofile="${distDir}/gdx-setup-ui.jar" file="extensions/gdx-setup-ui/gdx-setup-ui.jar"/>
 	</target>
 	
 	<!-- gdx core -->
@@ -234,7 +234,8 @@
 		</javadoc>
 	</target>
 	
-	<target name="all" depends="clean,gdx-setup-ui,gdx-core,gdx-openal,gdx-backend-lwjgl,gdx-backend-android,gdx-backend-gwt,gdx-tools,gdx-tiled-preprocessor,gdx-image,gdx-audio,gdx-freetype,docs">
+	<target name="all" 
+depends="clean,gdx-setup-ui,gdx-core,gdx-openal,gdx-backend-lwjgl,gdx-backend-android,gdx-backend-gwt,gdx-tools,gdx-tiled-preprocessor,gdx-image,gdx-audio,gdx-freetype,docs">
 		<!-- copy distribution files (licences etc.) -->
 		<copy tofile="${distDir}/README" file="gdx/dist/README"/>
 		<copy tofile="${distDir}/LICENSE" file="gdx/dist/LICENSE"/>
