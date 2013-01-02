@@ -38,35 +38,35 @@ import com.badlogic.gdx.utils.Pools;
  * @author Nathan Sweet */
 public class Slider extends Widget {
 	private SliderStyle style;
-	private float min, max, steps;
+	private float min, max, stepSize;
 	private float value;
 	private float sliderPos;
 	private boolean vertical;
 	int draggingPointer = -1;
 
-	public Slider (float min, float max, float steps, boolean vertical, Skin skin) {
-		this(min, max, steps, vertical, skin.get("default-" + (vertical ? "vertical" : "horizontal"), SliderStyle.class));
+	public Slider (float min, float max, float stepSize, boolean vertical, Skin skin) {
+		this(min, max, stepSize, vertical, skin.get("default-" + (vertical ? "vertical" : "horizontal"), SliderStyle.class));
 	}
 
-	public Slider (float min, float max, float steps, boolean vertical, Skin skin, String styleName) {
-		this(min, max, steps, vertical, skin.get(styleName, SliderStyle.class));
+	public Slider (float min, float max, float stepSize, boolean vertical, Skin skin, String styleName) {
+		this(min, max, stepSize, vertical, skin.get(styleName, SliderStyle.class));
 	}
 
 	/** Creates a new slider. It's width is determined by the given prefWidth parameter, its height is determined by the maximum of
 	 * the height of either the slider {@link NinePatch} or slider handle {@link TextureRegion}. The min and max values determine
-	 * the range the values of this slider can take on, the steps parameter specifies the distance between individual values. E.g.
-	 * min could be 4, max could be 10 and steps could be 0.2, giving you a total of 30 values, 4.0 4.2, 4.4 and so on.
+	 * the range the values of this slider can take on, the stepSize parameter specifies the distance between individual values.
+	 * E.g. min could be 4, max could be 10 and stepSize could be 0.2, giving you a total of 30 values, 4.0 4.2, 4.4 and so on.
 	 * @param min the minimum value
 	 * @param max the maximum value
-	 * @param steps the step size between values
+	 * @param stepSize the step size between values
 	 * @param style the {@link SliderStyle} */
-	public Slider (float min, float max, float steps, boolean vertical, SliderStyle style) {
+	public Slider (float min, float max, float stepSize, boolean vertical, SliderStyle style) {
 		if (min > max) throw new IllegalArgumentException("min must be > max: " + min + " > " + max);
-		if (steps <= 0) throw new IllegalArgumentException("steps must be > 0: " + steps);
+		if (stepSize <= 0) throw new IllegalArgumentException("stepSize must be > 0: " + stepSize);
 		setStyle(style);
 		this.min = min;
 		this.max = max;
-		this.steps = steps;
+		this.stepSize = stepSize;
 		this.vertical = vertical;
 		this.value = min;
 		setWidth(getPrefWidth());
@@ -108,6 +108,8 @@ public class Slider extends Widget {
 	public void draw (SpriteBatch batch, float parentAlpha) {
 		final Drawable knob = style.knob;
 		final Drawable bg = style.background;
+		final Drawable knobBefore = style.knobBefore;
+		final Drawable knobAfter = style.knobAfter;
 
 		Color color = getColor();
 		float x = getX();
@@ -120,22 +122,40 @@ public class Slider extends Widget {
 		if (vertical) {
 			bg.draw(batch, x + (int)((width - bg.getMinWidth()) * 0.5f), y, bg.getMinWidth(), height);
 
-			height -= bg.getTopHeight() + bg.getBottomHeight();
-			sliderPos = (value - min) / (max - min) * (height - knob.getMinHeight());
+			float sliderPosHeight = height - (bg.getTopHeight() + bg.getBottomHeight());
+			sliderPos = (value - min) / (max - min) * (sliderPosHeight - knob.getMinHeight());
 			sliderPos = Math.max(0, sliderPos);
-			sliderPos = Math.min(height - knob.getMinHeight(), sliderPos) + bg.getBottomHeight();
+			sliderPos = Math.min(sliderPosHeight - knob.getMinHeight(), sliderPos) + bg.getBottomHeight();
 
+			float knobHeightHalf = knob.getMinHeight() * 0.5f;
+			if (knobBefore != null) {
+				knobBefore.draw(batch, x + (int)((width - knobBefore.getMinWidth()) * 0.5f), y, knobBefore.getMinWidth(),
+					(int)(sliderPos + knobHeightHalf));
+			}
+			if (knobAfter != null) {
+				knobAfter.draw(batch, x + (int)((width - knobAfter.getMinWidth()) * 0.5f), y + (int)(sliderPos + knobHeightHalf),
+					knobAfter.getMinWidth(), height - (int)(sliderPos + knobHeightHalf));
+			}
 			knob.draw(batch, x + (int)((width - knob.getMinWidth()) * 0.5f), (int)(y + sliderPos), knob.getMinWidth(),
 				knob.getMinHeight());
 		} else {
 			bg.draw(batch, x, y + (int)((height - bg.getMinHeight()) * 0.5f), width, bg.getMinHeight());
 
-			width -= bg.getLeftWidth() + bg.getRightWidth();
-			sliderPos = (value - min) / (max - min) * (width - knob.getMinWidth());
+			float sliderPosWidth = width - (bg.getLeftWidth() + bg.getRightWidth());
+			sliderPos = (value - min) / (max - min) * (sliderPosWidth - knob.getMinWidth());
 			sliderPos = Math.max(0, sliderPos);
-			sliderPos = Math.min(width - knob.getMinWidth(), sliderPos) + bg.getLeftWidth();
+			sliderPos = Math.min(sliderPosWidth - knob.getMinWidth(), sliderPos) + bg.getLeftWidth();
 
-			knob.draw(batch, (int)(x + sliderPos), y + (int)((height - knob.getMinHeight()) * 0.5f), knob.getMinWidth(),
+			float knobHeightHalf = knob.getMinHeight() * 0.5f;
+			if (knobBefore != null) {
+				knobBefore.draw(batch, x, y + (int)((height - knobBefore.getMinHeight()) * 0.5f), (int)(sliderPos + knobHeightHalf),
+					knobBefore.getMinHeight());
+			}
+			if (knobAfter != null) {
+				knobAfter.draw(batch, x + (int)(sliderPos + knobHeightHalf), y + (int)((height - knobAfter.getMinHeight()) * 0.5f),
+					width - (int)(sliderPos + knobHeightHalf), knobAfter.getMinHeight());
+			}
+			knob.draw(batch, (int)(x + sliderPos), (int)(y + (height - knob.getMinHeight()) * 0.5f), knob.getMinWidth(),
 				knob.getMinHeight());
 		}
 	}
@@ -178,7 +198,7 @@ public class Slider extends Widget {
 	/** Sets the slider position, rounded to the nearest step size and clamped to the minumum and maximim values. */
 	public void setValue (float value) {
 		if (value < min || value > max) throw new IllegalArgumentException("value must be >= min and <= max: " + value);
-		value = MathUtils.clamp(Math.round(value / steps) * steps, min, max);
+		value = MathUtils.clamp(Math.round(value / stepSize) * stepSize, min, max);
 		float oldValue = this.value;
 		if (value == oldValue) return;
 		this.value = value;
@@ -193,6 +213,12 @@ public class Slider extends Widget {
 		this.min = min;
 		this.max = max;
 		setValue(min);
+	}
+
+	/** Sets the step size of the slider */
+	public void setStepSize (float stepSize) {
+		if (stepSize <= 0) throw new IllegalArgumentException("steps must be > 0: " + stepSize);
+		this.stepSize = stepSize;
 	}
 
 	public float getPrefWidth () {
@@ -217,6 +243,10 @@ public class Slider extends Widget {
 		return this.max;
 	}
 
+	public float getStepSize () {
+		return this.stepSize;
+	}
+
 	/** The style for a slider, see {@link Slider}.
 	 * @author mzechner
 	 * @author Nathan Sweet */
@@ -225,6 +255,8 @@ public class Slider extends Widget {
 		public Drawable background;
 		/** Centered on the background. */
 		public Drawable knob;
+		/** Optional. */
+		public Drawable knobBefore, knobAfter;
 
 		public SliderStyle () {
 		}

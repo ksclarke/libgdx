@@ -127,10 +127,15 @@ public class Quaternion implements Serializable {
 		float num7 = yaw * 0.5f;
 		float num2 = (float)Math.sin(num7);
 		float num = (float)Math.cos(num7);
-		x = ((num * num4) * num5) + ((num2 * num3) * num6);
-		y = ((num2 * num3) * num5) - ((num * num4) * num6);
-		z = ((num * num3) * num6) - ((num2 * num4) * num5);
-		w = ((num * num3) * num5) + ((num2 * num4) * num6);
+		float f1 = num * num4;
+		float f2 = num2 * num3;
+		float f3 = num * num3;
+		float f4 = num2 * num4;
+
+		x = (f1 * num5) + (f2 * num6);
+		y = (f2 * num5) - (f1 * num6);
+		z = (f3 * num6) - (f4 * num5);
+		w = (f3 * num5) + (f4 * num6);
 		return this;
 	}
 
@@ -345,6 +350,28 @@ public class Quaternion implements Serializable {
 		}
 
 		return set((float)x, (float)y, (float)z, (float)w);
+	}
+	
+	/** Set this quaternion to the rotation between two vectors.
+	 * @param v1 The base vector
+	 * @param v2 The target vector
+	 * @return This quaternion for chaining */
+	public Quaternion setFromCross (final Vector3 v1, final Vector3 v2) {
+		final float dot = MathUtils.clamp(Vector3.tmp.set(v1).nor().dot(Vector3.tmp2.set(v2).nor()), -1f, 1f);
+		return setFromAxis(Vector3.tmp.crs(Vector3.tmp2), (float)Math.acos(dot));
+	}
+	
+	/** Set this quaternion to the rotation between two vectors.
+	 * @param x1 The base vectors x value
+	 * @param y1 The base vectors y value
+	 * @param z1 The base vectors z value
+	 * @param x2 The target vector x value
+	 * @param y2 The target vector y value
+	 * @param z2 The target vector z value
+	 * @return This quaternion for chaining */
+	public Quaternion setFromCross (final float x1, final float y1, final float z1, final float x2, final float y2, final float z2) {
+		final float dot = MathUtils.clamp(Vector3.tmp.set(x1, y1, z1).nor().dot(Vector3.tmp2.set(x2, y2, z2).nor()), -1f, 1f);
+		return setFromAxis(Vector3.tmp.crs(Vector3.tmp2), (float)Math.acos(dot));
 	}
 
 	/** Spherical linear interpolation between this quaternion and the other quaternion, based on the alpha value in the range
