@@ -16,14 +16,6 @@
 
 package com.badlogic.gdx.backends.lwjgl;
 
-import java.awt.Canvas;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.lwjgl.LWJGLException;
-import org.lwjgl.opengl.Display;
-
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.ApplicationListener;
 import com.badlogic.gdx.Audio;
@@ -37,10 +29,17 @@ import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Clipboard;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 
+import java.awt.Canvas;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.lwjgl.LWJGLException;
+import org.lwjgl.opengl.Display;
+
 /** An OpenGL surface fullscreen or in a lightweight window. */
 public class LwjglApplication implements Application {
 	protected final LwjglGraphics graphics;
-	protected final OpenALAudio audio;
+	protected OpenALAudio audio;
 	protected final LwjglFiles files;
 	protected final LwjglInput input;
 	protected final LwjglNet net;
@@ -75,7 +74,8 @@ public class LwjglApplication implements Application {
 		LwjglNativesLoader.load();
 
 		this.graphics = graphics;
-		audio = new OpenALAudio(16, config.audioDeviceBufferCount, config.audioDeviceBufferSize);
+		if (!LwjglApplicationConfiguration.disableAudio)
+			audio = new OpenALAudio(16, config.audioDeviceBufferCount, config.audioDeviceBufferSize);
 		files = new LwjglFiles();
 		input = new LwjglInput();
 		net = new LwjglNet();
@@ -107,7 +107,7 @@ public class LwjglApplication implements Application {
 				try {
 					LwjglApplication.this.mainLoop();
 				} catch (Throwable t) {
-					audio.dispose();
+					if (audio != null) audio.dispose();
 					throw new GdxRuntimeException(t);
 				}
 			}
@@ -137,27 +137,6 @@ public class LwjglApplication implements Application {
 			}
 
 			boolean shouldRender = false;
-			synchronized (runnables) {
-				executedRunnables.clear();
-				executedRunnables.addAll(runnables);
-				runnables.clear();
-
-				for (int i = 0; i < executedRunnables.size; i++) {
-					shouldRender = true;
-					try {
-						executedRunnables.get(i).run();
-					} catch (Throwable t) {
-						t.printStackTrace();
-					}
-				}
-			}
-			
-			// if one of the runnables set running in false, for example after an exit().
-			if (!running)
-				break;
-			
-			input.update();
-			shouldRender |= graphics.shouldRender();
 
 			if (graphics.canvas != null) {
 				int width = graphics.canvas.getWidth();
@@ -183,8 +162,28 @@ public class LwjglApplication implements Application {
 				}
 			}
 
+			synchronized (runnables) {
+				executedRunnables.clear();
+				executedRunnables.addAll(runnables);
+				runnables.clear();
+
+				for (int i = 0; i < executedRunnables.size; i++) {
+					shouldRender = true;
+					try {
+						executedRunnables.get(i).run();
+					} catch (Throwable t) {
+						t.printStackTrace();
+					}
+				}
+			}
+
+			// If one of the runnables set running in false, for example after an exit().
+			if (!running) break;
+
+			input.update();
+			shouldRender |= graphics.shouldRender();
 			input.processEvents();
-			audio.update();
+			if (audio != null) audio.update();
 			if (shouldRender) {
 				graphics.updateTime();
 				listener.render();
@@ -202,7 +201,7 @@ public class LwjglApplication implements Application {
 		listener.pause();
 		listener.dispose();
 		Display.destroy();
-		audio.dispose();
+		if (audio != null) audio.dispose();
 		if (graphics.config.forceExit) System.exit(-1);
 	}
 
@@ -225,9 +224,9 @@ public class LwjglApplication implements Application {
 	public Input getInput () {
 		return input;
 	}
-	
+
 	@Override
-	public Net getNet() {
+	public Net getNet () {
 		return net;
 	}
 
@@ -271,7 +270,7 @@ public class LwjglApplication implements Application {
 			return prefs;
 		}
 	}
-	
+
 	@Override
 	public Clipboard getClipboard () {
 		return new LwjglClipboard();
