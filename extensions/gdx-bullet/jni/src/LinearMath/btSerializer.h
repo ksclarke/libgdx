@@ -25,12 +25,25 @@ subject to the following restrictions:
 #endif
 #include <string.h>
 
+#ifdef BT_HAVE_STDINT_H
+#include <stdint.h>
+#endif
+
+#ifdef BT_HAVE_UINTPTR_T
+typedef uintptr_t uintptr;
+#else
+	#ifdef BT_HAVE_ULONG_PTR
+	typedef ULONG_PTR uintptr;
+	#else
+	typedef unsigned long long uintptr;
+	#endif
+#endif
 
 
 ///only the 32bit versions for now
-extern char sBulletDNAstr[];
+extern unsigned char sBulletDNAstr[];
 extern int sBulletDNAlen;
-extern char sBulletDNAstr64[];
+extern unsigned char sBulletDNAstr64[];
 extern int sBulletDNAlen64;
 
 SIMD_FORCE_INLINE	int btStrLen(const char* str) 
@@ -213,7 +226,7 @@ protected:
 
 			int *intPtr=0;
 			short *shtPtr=0;
-			char *cp = 0;int dataLen =0;
+			char *cp = 0;int dataLen =0;long nr=0;
 			intPtr = (int*)m_dna;
 
 			/*
@@ -246,7 +259,15 @@ protected:
 				while (*cp)cp++;
 				cp++;
 			}
-			cp = btAlignPointer(cp,4);
+			{
+				nr= (uintptr)cp;
+			//	long mask=3;
+				nr= ((nr+3)&~3)-nr;
+				while (nr--)
+				{
+					cp++;
+				}
+			}
 
 			/*
 				TYPE (4 bytes)
@@ -273,7 +294,15 @@ protected:
 				cp++;
 			}
 
-			cp = btAlignPointer(cp,4);
+		{
+				nr= (uintptr)cp;
+			//	long mask=3;
+				nr= ((nr+3)&~3)-nr;
+				while (nr--)
+				{
+					cp++;
+				}
+			}
 
 
 			/*
@@ -437,8 +466,8 @@ public:
 
 
 			buffer[9] = '2';
-			buffer[10] = '8';
-			buffer[11] = '0';
+			buffer[10] = '7';
+			buffer[11] = '8';
 
 		}
 
