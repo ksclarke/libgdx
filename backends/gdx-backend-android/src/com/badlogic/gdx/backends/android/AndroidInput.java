@@ -34,7 +34,6 @@ import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.View;
 import android.view.WindowManager;
-import android.view.View.OnGenericMotionListener;
 import android.view.View.OnKeyListener;
 import android.view.View.OnTouchListener;
 import android.view.inputmethod.InputMethodManager;
@@ -53,7 +52,7 @@ import com.badlogic.gdx.utils.Pool;
  * 
  * @author mzechner */
 /** @author jshapcot */
-public class AndroidInput implements Input, OnKeyListener, OnTouchListener, OnGenericMotionListener {
+public class AndroidInput implements Input, OnKeyListener, OnTouchListener {
 	static class KeyEvent {
 		static final int KEY_DOWN = 0;
 		static final int KEY_UP = 1;
@@ -89,8 +88,7 @@ public class AndroidInput implements Input, OnKeyListener, OnTouchListener, OnGe
 		}
 	};
 
-	ArrayList<OnKeyListener> keyListeners = new ArrayList();
-	ArrayList<OnGenericMotionListener> genericMotionListeners = new ArrayList();
+	ArrayList<OnKeyListener> keyListeners = new ArrayList();	
 	ArrayList<KeyEvent> keyEvents = new ArrayList();
 	ArrayList<TouchEvent> touchEvents = new ArrayList();
 	int[] touchX = new int[20];
@@ -137,8 +135,7 @@ public class AndroidInput implements Input, OnKeyListener, OnTouchListener, OnGe
 		if (view instanceof View) {
 			View v = (View)view;
 			v.setOnKeyListener(this);
-			v.setOnTouchListener(this);
-			v.setOnGenericMotionListener(this);
+			v.setOnTouchListener(this);			
 			v.setFocusable(true);
 			v.setFocusableInTouchMode(true);
 			v.requestFocus();
@@ -395,13 +392,6 @@ public class AndroidInput implements Input, OnKeyListener, OnTouchListener, OnGe
 	boolean requestFocus = true;
 
 	@Override
-	public boolean onGenericMotion (View view, MotionEvent event) {
-		for (int i = 0, n = genericMotionListeners.size(); i < n; i++)
-			if (genericMotionListeners.get(i).onGenericMotion(view, event)) return true;
-		return false;
-	}
-
-	@Override
 	public boolean onTouch (View view, MotionEvent event) {
 		if (requestFocus && view != null) {
 			view.requestFocus();
@@ -459,7 +449,7 @@ public class AndroidInput implements Input, OnKeyListener, OnTouchListener, OnGe
 	@Override
 	public boolean onKey (View v, int keyCode, android.view.KeyEvent e) {
 		for (int i = 0, n = keyListeners.size(); i < n; i++)
-			keyListeners.get(i).onKey(v, keyCode, e);
+			if(keyListeners.get(i).onKey(v, keyCode, e)) return true;
 
 		synchronized (this) {
 			char character = (char)e.getUnicodeChar();
@@ -775,11 +765,7 @@ public class AndroidInput implements Input, OnKeyListener, OnTouchListener, OnGe
 	public void addKeyListener (OnKeyListener listener) {
 		keyListeners.add(listener);
 	}
-
-	public void addGenericMotionListener (OnGenericMotionListener listener) {
-		genericMotionListeners.add(listener);
-	}
-
+	
 	/** Our implementation of SensorEventListener. Because Android doesn't like it when we register more than one Sensor to a single
 	 * SensorEventListener, we add one of these for each Sensor. Could use an anonymous class, but I don't see any harm in
 	 * explicitly defining it here. Correct me if I am wrong. */
