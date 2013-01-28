@@ -20,6 +20,10 @@ subject to the following restrictions:
 #include "../SpuFakeDma.h"
 #include "LinearMath/btMinMax.h"
 
+#ifdef __MINGW32__
+	#define uint64_t unsigned long long
+#endif
+
 #ifdef __SPU__
 #include <spu_printf.h>
 #else

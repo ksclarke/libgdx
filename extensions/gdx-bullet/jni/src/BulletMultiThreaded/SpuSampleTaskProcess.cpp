@@ -22,6 +22,10 @@ subject to the following restrictions:
 #include "SpuSampleTaskProcess.h"
 #include <stdio.h>
 
+#ifdef __MINGW32__
+	#define uint64_t unsigned long long
+#endif
+
 #ifdef __SPU__
 
 

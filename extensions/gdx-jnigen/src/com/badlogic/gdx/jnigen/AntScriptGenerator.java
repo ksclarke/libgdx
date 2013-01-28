@@ -73,8 +73,10 @@ public class AntScriptGenerator {
 		copyJniHeaders(config.jniDir.path());
 		
 		// copy memcpy_wrap.c, needed if your build platform uses the latest glibc, e.g. Ubuntu 12.10
-		new FileDescriptor("com/badlogic/gdx/jnigen/resources/scripts/memcpy_wrap.c", FileType.Classpath).copyTo(
-			config.jniDir.child("memcpy_wrap.c"));
+		if(config.jniDir.child("memcpy_wrap.c").exists() == false) {
+			new FileDescriptor("com/badlogic/gdx/jnigen/resources/scripts/memcpy_wrap.c", FileType.Classpath).copyTo(
+				config.jniDir.child("memcpy_wrap.c"));
+		}
 
 		ArrayList<String> buildFiles = new ArrayList<String>();
 		ArrayList<String> libsDirs = new ArrayList<String>();
@@ -133,7 +135,7 @@ public class AntScriptGenerator {
 	private void copyJniHeaders (String jniDir) {
 		final String pack = "com/badlogic/gdx/jnigen/resources/headers";
 		String files[] = {"classfile_constants.h", "jawt.h", "jdwpTransport.h", "jni.h", "linux/jawt_md.h", "linux/jni_md.h",
-			"mac/jni_md.h", "win32/jawt_md.h", "win32/jni_md.h"};
+			"mac/jni_md.h", "win32/jawt_md.h", "win32/jni_md.h", "raspbian/jawt_md.h", "raspbian/jni_md.h" };
 
 		for (String file : files) {
 			new FileDescriptor(pack, FileType.Classpath).child(file).copyTo(
@@ -148,7 +150,7 @@ public class AntScriptGenerator {
 		if (os == TargetOs.Windows) {
 			libSuffix = (is64Bit ? "64" : "") + ".dll";
 		}
-		if (os == TargetOs.Linux || os == TargetOs.Android) {
+		if (os == TargetOs.Linux || os == TargetOs.Android || os == TargetOs.Raspbian) {
 			libPrefix = "lib";
 			libSuffix = (is64Bit ? "64" : "") + ".so";
 		}
@@ -163,6 +165,7 @@ public class AntScriptGenerator {
 		if (os == TargetOs.Windows) return "win32";
 		if (os == TargetOs.Linux) return "linux";
 		if (os == TargetOs.MacOsX) return "mac";
+		if (os == TargetOs.Raspbian) return "raspbian";
 		return "";
 	}
 

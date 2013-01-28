@@ -45,8 +45,9 @@ public class GdxBuild {
 		BuildTarget lin64 = BuildTarget.newDefaultTarget(TargetOs.Linux, true);
 		BuildTarget android = BuildTarget.newDefaultTarget(TargetOs.Android, false);
 		BuildTarget mac = BuildTarget.newDefaultTarget(TargetOs.MacOsX, false);
+		BuildTarget raspbian = BuildTarget.newDefaultTarget(TargetOs.Raspbian, false);
 		new AntScriptGenerator().generate(new BuildConfig("gdx", "../target/native", LIBS_DIR, JNI_DIR), mac, win32home, win32,
-			win64, lin32, lin64, android);
+			win64, lin32, lin64, android, raspbian);
 
 		// build natives
 		// BuildExecutor.executeAnt("jni/build-windows32home.xml", "-v");

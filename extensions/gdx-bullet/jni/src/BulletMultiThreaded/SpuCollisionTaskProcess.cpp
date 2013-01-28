@@ -21,7 +21,9 @@ subject to the following restrictions:
 
 #include "SpuCollisionTaskProcess.h"
 
-
+#ifdef __MINGW32__
+	#define uint64_t unsigned long long
+#endif
 
 
 void	SpuCollisionTaskProcess::setNumTasks(int maxNumTasks)

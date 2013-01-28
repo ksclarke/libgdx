@@ -478,7 +478,7 @@ static void* localBufMalloc(int size)
 	if((sLocalBufUsed + size16) > LOCAL_BUF_SIZE)
 	{ // reset
 		spLocalBufCurr = sLocalMemBuf;
-		while((unsigned long)spLocalBufCurr & 0x0F) spLocalBufCurr++; // align to 16 bytes
+		while((unsigned long long)spLocalBufCurr & 0x0F) spLocalBufCurr++; // align to 16 bytes
 		sLocalBufUsed = 0;
 	}
 	void* ret = spLocalBufCurr;
@@ -534,15 +534,13 @@ CL_API_ENTRY cl_kernel CL_API_CALL clCreateKernel(cl_program       program ,
                cl_int *         errcode_ret ) CL_API_SUFFIX__VERSION_1_0
 {
 	MiniCLTaskScheduler* scheduler = (MiniCLTaskScheduler*) program;
+	MiniCLKernel* kernel = new MiniCLKernel();
 	int nameLen = strlen(kernel_name);
 	if(nameLen >= MINI_CL_MAX_KERNEL_NAME)
 	{
 		*errcode_ret = CL_INVALID_KERNEL_NAME;
 		return NULL;
 	}
-
-	MiniCLKernel* kernel = new MiniCLKernel();
-
 	strcpy(kernel->m_name, kernel_name);
 	kernel->m_numArgs = 0;
 
@@ -558,7 +556,6 @@ CL_API_ENTRY cl_kernel CL_API_CALL clCreateKernel(cl_program       program ,
 	if(kernel->registerSelf() == NULL)
 	{
 		*errcode_ret = CL_INVALID_KERNEL_NAME;
-		delete kernel;
 		return NULL;
 	}
 	else
@@ -649,9 +646,7 @@ extern CL_API_ENTRY cl_int CL_API_CALL clGetContextInfo(cl_context         /* co
 	return 0;
 }
 
-
-
-CL_API_ENTRY cl_context CL_API_CALL clCreateContextFromType(const cl_context_properties * /* properties */,
+CL_API_ENTRY cl_context CL_API_CALL clCreateContextFromType(cl_context_properties * /* properties */,
                         cl_device_type           device_type ,
                         void (*pfn_notify)(const char *, const void *, size_t, void *) /* pfn_notify */,
                         void *                  /* user_data */,
@@ -709,28 +704,6 @@ CL_API_ENTRY cl_context CL_API_CALL clCreateContextFromType(const cl_context_pro
 
 	*errcode_ret = 0;
 	return (cl_context)scheduler;
-}
-
-CL_API_ENTRY cl_int CL_API_CALL
-clGetDeviceIDs(cl_platform_id   /* platform */,
-               cl_device_type   /* device_type */, 
-               cl_uint          /* num_entries */, 
-               cl_device_id *   /* devices */, 
-               cl_uint *        /* num_devices */) CL_API_SUFFIX__VERSION_1_0
-{
-	return 0;
-}
-
-CL_API_ENTRY cl_context CL_API_CALL
-clCreateContext(const cl_context_properties *  properties ,
-                cl_uint                        num_devices ,
-                const cl_device_id *           devices ,
-                 void (*pfn_notify)(const char *, const void *, size_t, void *),
-                void *                         user_data ,
-                cl_int *                       errcode_ret ) CL_API_SUFFIX__VERSION_1_0
-{
-	
-	return	clCreateContextFromType(properties,CL_DEVICE_TYPE_ALL,pfn_notify,user_data,errcode_ret);
 }
 
 CL_API_ENTRY cl_int CL_API_CALL clReleaseContext(cl_context  context ) CL_API_SUFFIX__VERSION_1_0

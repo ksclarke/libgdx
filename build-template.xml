@@ -33,6 +33,7 @@ zipfileset id="jarfiles" -> the jar files to be merged with the project's classe
 		<mkdir dir="${libs}/macosx32" />
 		<mkdir dir="${libs}/windows32" />
 		<mkdir dir="${libs}/windows64" />
+		<mkdir dir="${libs}/raspbian" />
 		
 		<mkdir dir="${target}" />
 		<mkdir dir="${target}/java" />
