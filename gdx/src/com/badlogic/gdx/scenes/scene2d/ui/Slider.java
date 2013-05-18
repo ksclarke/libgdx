@@ -28,7 +28,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener.ChangeEvent;
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.utils.Pools;
 
-/** A slider is a horizontal indicator that allows a user to set a value. The slider his a range (min, max) and a stepping between
+/** A slider is a horizontal indicator that allows a user to set a value. The slider has a range (min, max) and a stepping between
  * each value the slider represents.
  * <p>
  * {@link ChangeEvent} is fired when the slider knob is moved. Cancelling the event will move the knob to where it was previously.
@@ -86,7 +86,12 @@ public class Slider extends Widget {
 			public void touchUp (InputEvent event, float x, float y, int pointer, int button) {
 				if (pointer != draggingPointer) return;
 				draggingPointer = -1;
-				calculatePositionAndValue(x, y);
+				if (!calculatePositionAndValue(x, y)) {
+					// Fire an event on touchUp even if the value didn't change, so listeners can see when a drag ends via isDragging.
+					ChangeEvent changeEvent = Pools.obtain(ChangeEvent.class);
+					fire(changeEvent);
+					Pools.free(changeEvent);
+				}
 			}
 
 			public void touchDragged (InputEvent event, float x, float y, int pointer) {
@@ -134,9 +139,11 @@ public class Slider extends Widget {
 			bg.draw(batch, x + (int)((width - bg.getMinWidth()) * 0.5f), y, bg.getMinWidth(), height);
 
 			float sliderPosHeight = height - (bg.getTopHeight() + bg.getBottomHeight());
-			sliderPos = (value - min) / (max - min) * (sliderPosHeight - knobHeight);
-			sliderPos = Math.max(0, sliderPos);
-			sliderPos = Math.min(sliderPosHeight - knobHeight, sliderPos) + bg.getBottomHeight();
+			if (min != max) {
+				sliderPos = (value - min) / (max - min) * (sliderPosHeight - knobHeight);
+				sliderPos = Math.max(0, sliderPos);
+				sliderPos = Math.min(sliderPosHeight - knobHeight, sliderPos) + bg.getBottomHeight();
+			}
 
 			float knobHeightHalf = knobHeight * 0.5f;
 			if (knobBefore != null) {
@@ -152,9 +159,11 @@ public class Slider extends Widget {
 			bg.draw(batch, x, y + (int)((height - bg.getMinHeight()) * 0.5f), width, bg.getMinHeight());
 
 			float sliderPosWidth = width - (bg.getLeftWidth() + bg.getRightWidth());
-			sliderPos = (value - min) / (max - min) * (sliderPosWidth - knobWidth);
-			sliderPos = Math.max(0, sliderPos);
-			sliderPos = Math.min(sliderPosWidth - knobWidth, sliderPos) + bg.getLeftWidth();
+			if (min != max) {
+				sliderPos = (value - min) / (max - min) * (sliderPosWidth - knobWidth);
+				sliderPos = Math.max(0, sliderPos);
+				sliderPos = Math.min(sliderPosWidth - knobWidth, sliderPos) + bg.getLeftWidth();
+			}
 
 			float knobHeightHalf = knobHeight * 0.5f;
 			if (knobBefore != null) {
@@ -170,7 +179,7 @@ public class Slider extends Widget {
 		}
 	}
 
-	void calculatePositionAndValue (float x, float y) {
+	boolean calculatePositionAndValue (float x, float y) {
 		final Drawable knob = style.knob;
 		final Drawable bg = style.background;
 
@@ -194,8 +203,9 @@ public class Slider extends Widget {
 		}
 
 		float oldValue = value;
-		setValue(value);
+		boolean valueSet = setValue(value);
 		if (value == oldValue) sliderPos = oldPosition;
+		return valueSet;
 	}
 
 	/** Returns true if the slider is being dragged. */
@@ -213,30 +223,34 @@ public class Slider extends Widget {
 		return value;
 	}
 
-	/** Sets the slider position, rounded to the nearest step size and clamped to the minumum and maximim values. */
-	public void setValue (float value) {
-		if (value < min || value > max) throw new IllegalArgumentException("value must be >= min and <= max: " + value);
+	/** Sets the slider position, rounded to the nearest step size and clamped to the minumum and maximim values.
+	 * @return false if the value was not changed because the slider already had the value or it was canceled by a listener. */
+	public boolean setValue (float value) {
 		value = MathUtils.clamp(Math.round(value / stepSize) * stepSize, min, max);
 		float oldValue = this.value;
-		if (value == oldValue) return;
+		if (value == oldValue) return false;
 		float oldVisualValue = getVisualValue();
 		this.value = value;
 		ChangeEvent changeEvent = Pools.obtain(ChangeEvent.class);
-		if (fire(changeEvent))
+		boolean cancelled = fire(changeEvent);
+		if (cancelled)
 			this.value = oldValue;
 		else if (animateDuration > 0) {
 			animateFromValue = oldVisualValue;
 			animateTime = animateDuration;
 		}
 		Pools.free(changeEvent);
+		return !cancelled;
 	}
 
 	/** Sets the range of this slider. The slider's current value is reset to min. */
 	public void setRange (float min, float max) {
-		if (min >= max) throw new IllegalArgumentException("min must be < max");
+		if (min > max) throw new IllegalArgumentException("min must be <= max");
 		this.min = min;
 		this.max = max;
-		setValue(min);
+		if (value < min)
+			setValue(min);
+		else if (value > max) setValue(max);
 	}
 
 	/** Sets the step size of the slider */

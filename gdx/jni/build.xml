@@ -5,7 +5,6 @@
 		<ant antfile="build-linux32.xml" target="clean"/>
 		<ant antfile="build-linux64.xml" target="clean"/>
 		<ant antfile="build-android32.xml" target="clean"/>
-		<ant antfile="build-raspbian32.xml" target="clean"/>
 
 	</target>
 	
@@ -15,7 +14,6 @@
 		<ant antfile="build-linux32.xml"/>
 		<ant antfile="build-linux64.xml"/>
 		<ant antfile="build-android32.xml"/>
-		<ant antfile="build-raspbian32.xml"/>
 
 	</target>
 	
@@ -27,7 +25,7 @@
 			<fileset dir="../libs/linux32" includes="libgdx.so"/>
 			<fileset dir="../libs/linux64" includes="libgdx64.so"/>
 			<fileset dir="../libs/android32" includes="libgdx.so"/>
-			<fileset dir="../libs/raspbian32" includes="libgdx.so"/>
+			<fileset dir="../libs/ios32" includes="libgdx.a"/>
 
 		</jar>
 	</target>

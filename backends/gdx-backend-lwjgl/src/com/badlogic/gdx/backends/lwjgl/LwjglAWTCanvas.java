@@ -150,6 +150,11 @@ public class LwjglAWTCanvas implements Application {
 	protected void setTitle (String title) {
 	}
 
+	@Override
+	public ApplicationListener getApplicationListener () {
+		return listener;
+	}
+
 	public Canvas getCanvas () {
 		return canvas;
 	}
@@ -268,14 +273,23 @@ public class LwjglAWTCanvas implements Application {
 		running = false;
 		setGlobals();
 		Array<LifecycleListener> listeners = lifecycleListeners;
-		synchronized(listeners) {
-			for(LifecycleListener listener: listeners) {
+		synchronized (listeners) {
+			for (LifecycleListener listener : listeners) {
 				listener.pause();
 				listener.dispose();
 			}
 		}
 		listener.pause();
 		listener.dispose();
+
+		if (audio != null) {
+			audio.dispose();
+			Gdx.audio = null;
+		}
+
+		if (files != null) Gdx.files = null;
+
+		if (net != null) Gdx.net = null;
 	}
 
 	@Override
@@ -367,16 +381,7 @@ public class LwjglAWTCanvas implements Application {
 		postRunnable(new Runnable() {
 			@Override
 			public void run () {
-				setGlobals();
-				Array<LifecycleListener> listeners = lifecycleListeners;
-				synchronized(listeners) {
-					for(LifecycleListener listener: listeners) {
-						listener.pause();
-						listener.dispose();
-					}
-				}
-				LwjglAWTCanvas.this.listener.pause();
-				LwjglAWTCanvas.this.listener.dispose();
+				stop();
 				System.exit(-1);
 			}
 		});
@@ -393,22 +398,31 @@ public class LwjglAWTCanvas implements Application {
 		}
 	}
 
+	/** Test whether the canvas' context is current. */
+	public boolean isCurrent () {
+		try {
+			return canvas.isCurrent();
+		} catch (LWJGLException ex) {
+			throw new GdxRuntimeException(ex);
+		}
+	}
+
 	/** @param cursor May be null. */
 	public void setCursor (Cursor cursor) {
 		this.cursor = cursor;
 	}
-	
+
 	@Override
 	public void addLifecycleListener (LifecycleListener listener) {
-		synchronized(lifecycleListeners) {
+		synchronized (lifecycleListeners) {
 			lifecycleListeners.add(listener);
 		}
 	}
 
 	@Override
 	public void removeLifecycleListener (LifecycleListener listener) {
-		synchronized(lifecycleListeners) {
+		synchronized (lifecycleListeners) {
 			lifecycleListeners.removeValue(listener, true);
-		}		
+		}
 	}
 }

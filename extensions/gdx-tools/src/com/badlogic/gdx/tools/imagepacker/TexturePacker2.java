@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
+
 package com.badlogic.gdx.tools.imagepacker;
 
 import java.awt.Color;
@@ -21,8 +22,9 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
@@ -30,11 +32,15 @@ import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Pixmap.Format;
 import com.badlogic.gdx.graphics.Texture.TextureFilter;
 import com.badlogic.gdx.graphics.Texture.TextureWrap;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas.TextureAtlasData;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas.TextureAtlasData.Region;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.GdxRuntimeException;
 
 /** @author Nathan Sweet */
 public class TexturePacker2 {
@@ -42,6 +48,7 @@ public class TexturePacker2 {
 	private final MaxRectsPacker maxRectsPacker;
 	private final ImageProcessor imageProcessor;
 
+	/** @param rootDir Can be null. */
 	public TexturePacker2 (File rootDir, Settings settings) {
 		this.settings = settings;
 
@@ -56,8 +63,16 @@ public class TexturePacker2 {
 		imageProcessor = new ImageProcessor(rootDir, settings);
 	}
 
+	public TexturePacker2 (Settings settings) {
+		this(null, settings);
+	}
+
 	public void addImage (File file) {
 		imageProcessor.addImage(file);
+	}
+
+	public void addImage (BufferedImage image, String name) {
+		imageProcessor.addImage(image, name);
 	}
 
 	public void pack (File outputDir, String packFileName) {
@@ -103,6 +118,14 @@ public class TexturePacker2 {
 			width = Math.max(settings.minWidth, width);
 			height = Math.max(settings.minHeight, height);
 
+			if (settings.forceSquareOutput) {
+				if (width > height) {
+					height = width;
+				} else {
+					width = height;
+				}
+			}
+
 			File outputFile;
 			while (true) {
 				outputFile = new File(outputDir, imageName + (fileIndex++ == 0 ? "" : fileIndex) + "." + settings.outputFormat);
@@ -131,8 +154,10 @@ public class TexturePacker2 {
 					int imageHeight = image.getHeight();
 					// Copy corner pixels to fill corners of the padding.
 					g.drawImage(image, rectX - amountX, rectY - amountY, rectX, rectY, 0, 0, 1, 1, null);
-					g.drawImage(image, rectX + imageWidth, rectY - amountY, rectX + imageWidth + amountX, rectY, imageWidth - 1, 0, imageWidth, 1, null);
-					g.drawImage(image, rectX - amountX, rectY + imageHeight, rectX, rectY + imageHeight + amountY, 0, imageHeight - 1, 1, imageHeight, null);
+					g.drawImage(image, rectX + imageWidth, rectY - amountY, rectX + imageWidth + amountX, rectY, imageWidth - 1, 0,
+						imageWidth, 1, null);
+					g.drawImage(image, rectX - amountX, rectY + imageHeight, rectX, rectY + imageHeight + amountY, 0, imageHeight - 1,
+						1, imageHeight, null);
 					g.drawImage(image, rectX + imageWidth, rectY + imageHeight, rectX + imageWidth + amountX, rectY + imageHeight
 						+ amountY, imageWidth - 1, imageHeight - 1, imageWidth, imageHeight, null);
 					// Copy edge pixels into padding.
@@ -171,8 +196,10 @@ public class TexturePacker2 {
 					ImageOutputStream ios = ImageIO.createImageOutputStream(outputFile);
 					writer.setOutput(ios);
 					writer.write(null, new IIOImage(canvas, null, null), param);
-				} else
+				} else {
+					if (settings.premultiplyAlpha) canvas.getColorModel().coerceData(canvas.getRaster(), true);
 					ImageIO.write(canvas, "png", outputFile);
+				}
 			} catch (IOException ex) {
 				throw new RuntimeException("Error writing file: " + outputFile, ex);
 			}
@@ -181,7 +208,27 @@ public class TexturePacker2 {
 
 	private void writePackFile (File outputDir, Array<Page> pages, String packFileName) throws IOException {
 		File packFile = new File(outputDir, packFileName);
+
+		if (packFile.exists()) {
+			// Make sure there aren't duplicate names.
+			TextureAtlasData textureAtlasData = new TextureAtlasData(new FileHandle(packFile), new FileHandle(packFile), false);
+			for (Page page : pages) {
+				for (Rect rect : page.outputRects) {
+					String rectName = Rect.getAtlasName(rect.name, settings.flattenPaths);
+					System.out.println(rectName);
+					for (Region region : textureAtlasData.getRegions()) {
+						if (region.name.equals(rectName)) {
+							throw new GdxRuntimeException("A region with the name \"" + rectName + "\" has already been packed: "
+								+ rect.name);
+						}
+					}
+				}
+			}
+		}
+
 		FileWriter writer = new FileWriter(packFile, true);
+// if (settings.jsonOutput) {
+// } else {
 		for (Page page : pages) {
 			writer.write("\n" + page.imageName + "\n");
 			writer.write("format: " + settings.format + "\n");
@@ -189,18 +236,17 @@ public class TexturePacker2 {
 			writer.write("repeat: " + getRepeatValue() + "\n");
 
 			for (Rect rect : page.outputRects) {
-				writeRect(writer, page, rect);
-				for (Rect alias : rect.aliases) {
-					alias.setSize(rect);
-					writeRect(writer, page, alias);
-				}
+				writeRect(writer, page, rect, rect.name);
+				for (String alias : rect.aliases)
+					writeRect(writer, page, rect, alias);
 			}
 		}
+// }
 		writer.close();
 	}
 
-	private void writeRect (FileWriter writer, Page page, Rect rect) throws IOException {
-		writer.write(rect.name + "\n");
+	private void writeRect (FileWriter writer, Page page, Rect rect, String name) throws IOException {
+		writer.write(Rect.getAtlasName(name, settings.flattenPaths) + "\n");
 		writer.write("  rotate: " + rect.rotated + "\n");
 		writer.write("  xy: " + (page.x + rect.x) + ", " + (page.y + page.height - rect.height - rect.y) + "\n");
 		writer.write("  size: " + rect.image.getWidth() + ", " + rect.image.getHeight() + "\n");
@@ -255,7 +301,7 @@ public class TexturePacker2 {
 		public int x, y, width, height;
 		public int index;
 		public boolean rotated;
-		public ArrayList<Rect> aliases = new ArrayList();
+		public Set<String> aliases = new HashSet<String>();
 		public int[] splits;
 		public int[] pads;
 		public boolean canRotate = true;
@@ -324,6 +370,10 @@ public class TexturePacker2 {
 		public String toString () {
 			return name + "[" + x + "," + y + " " + width + "x" + height + "]";
 		}
+
+		static public String getAtlasName (String name, boolean flattenPaths) {
+			return flattenPaths ? new FileHandle(name).name() : name;
+		}
 	}
 
 	/** @author Nathan Sweet */
@@ -335,6 +385,7 @@ public class TexturePacker2 {
 		public boolean rotation;
 		public int minWidth = 16, minHeight = 16;
 		public int maxWidth = 1024, maxHeight = 1024;
+		public boolean forceSquareOutput = false;
 		public boolean stripWhitespaceX, stripWhitespaceY;
 		public int alphaThreshold;
 		public TextureFilter filterMin = TextureFilter.Nearest, filterMag = TextureFilter.Nearest;
@@ -346,6 +397,10 @@ public class TexturePacker2 {
 		public boolean ignoreBlankImages = true;
 		public boolean fast;
 		public boolean debug;
+		public boolean combineSubdirectories;
+		public boolean flattenPaths;
+		public boolean premultiplyAlpha;
+		public boolean useIndexes = true;
 
 		public Settings () {
 		}
@@ -375,6 +430,9 @@ public class TexturePacker2 {
 			wrapY = settings.wrapY;
 			duplicatePadding = settings.duplicatePadding;
 			debug = settings.debug;
+			combineSubdirectories = settings.combineSubdirectories;
+			flattenPaths = settings.flattenPaths;
+			premultiplyAlpha = settings.premultiplyAlpha;
 		}
 	}
 
