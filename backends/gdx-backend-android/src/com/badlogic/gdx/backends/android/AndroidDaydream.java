@@ -214,6 +214,10 @@ public class AndroidDaydream extends DreamService implements Application {
 		int[] realId = input.realId;
 		for (int i = 0; i < realId.length; i++)
 			realId[i] = -1;
+		// erase touched state. this also sucks donkeyballs...
+		boolean[] touched = input.touched;
+		for (int i = 0; i < touched.length; i++)
+			touched[i] = false;
 
 		graphics.clearManagedCaches();
 		graphics.destroy();
@@ -384,6 +388,11 @@ public class AndroidDaydream extends DreamService implements Application {
 	@Override
 	public void setLogLevel (int logLevel) {
 		this.logLevel = logLevel;
+	}
+
+	@Override
+	public int getLogLevel() {
+		return logLevel;
 	}
 
 	@Override

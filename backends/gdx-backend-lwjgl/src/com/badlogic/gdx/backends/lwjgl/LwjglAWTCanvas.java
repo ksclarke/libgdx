@@ -219,6 +219,8 @@ public class LwjglAWTCanvas implements Application {
 	}
 
 	void render () {
+		if (!running) return;
+		
 		setGlobals();
 		canvas.setCursor(cursor);
 		graphics.updateTime();
@@ -282,6 +284,10 @@ public class LwjglAWTCanvas implements Application {
 		listener.pause();
 		listener.dispose();
 
+		Gdx.app = null;
+		
+		Gdx.graphics = null;
+		
 		if (audio != null) {
 			audio.dispose();
 			Gdx.audio = null;
@@ -290,6 +296,8 @@ public class LwjglAWTCanvas implements Application {
 		if (files != null) Gdx.files = null;
 
 		if (net != null) Gdx.net = null;
+		
+		stopped();
 	}
 
 	@Override
@@ -374,6 +382,11 @@ public class LwjglAWTCanvas implements Application {
 	@Override
 	public void setLogLevel (int logLevel) {
 		this.logLevel = logLevel;
+	}
+
+	@Override
+	public int getLogLevel() {
+		return logLevel;
 	}
 
 	@Override

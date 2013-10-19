@@ -45,17 +45,17 @@ public class RayCastTest extends BaseBulletTest {
 	@Override
 	public void create () {
 		super.create();
-		instructions = "Tap a box to ray cast\nLong press to toggle debug mode\nSwipe for next test";
+		instructions = "Tap a box to ray cast\nLong press to toggle debug mode\nSwipe for next test\nCtrl+drag to rotate\nScroll to zoom";
 
 		// Create the entities
 		world.add("ground", -7f, 0f, -7f)
-			.color.set(0.25f + 0.5f * (float)Math.random(), 0.25f + 0.5f * (float)Math.random(), 0.25f + 0.5f * (float)Math.random(), 1f);
+			.setColor(0.25f + 0.5f * (float)Math.random(), 0.25f + 0.5f * (float)Math.random(), 0.25f + 0.5f * (float)Math.random(), 1f);
 
 		for (int x = 0; x < BOXCOUNT_X; x++) {
 			for (int y = 0; y < BOXCOUNT_Y; y++) {
 				for (int z = 0; z < BOXCOUNT_Z; z++) {
 					world.add("box", BOXOFFSET_X + x, BOXOFFSET_Y + y, BOXOFFSET_Z + z)
-						.color.set(0.5f + 0.5f * (float)Math.random(), 0.5f + 0.5f * (float)Math.random(), 0.5f + 0.5f * (float)Math.random(), 1f);
+						.setColor(0.5f + 0.5f * (float)Math.random(), 0.5f + 0.5f * (float)Math.random(), 0.5f + 0.5f * (float)Math.random(), 1f);
 				}
 			}
 		}
@@ -66,7 +66,7 @@ public class RayCastTest extends BaseBulletTest {
 	@Override
 	public void dispose () {
 		if (rayTestCB != null)
-			rayTestCB.delete();
+			rayTestCB.dispose();
 		rayTestCB = null;
 		super.dispose();
 	}
@@ -78,17 +78,17 @@ public class RayCastTest extends BaseBulletTest {
 		rayTo.set(ray.direction).scl(50f).add(rayFrom); // 50 meters max from the origin
 
 		// Because we reuse the ClosestRayResultCallback, we need reset it's values
-		rayTestCB.setM_collisionObject(null);
-		rayTestCB.setM_closestHitFraction(1f);
-		rayTestCB.getM_rayFromWorld().setValue(rayFrom.x, rayFrom.y, rayFrom.z);
-		rayTestCB.getM_rayToWorld().setValue(rayTo.x, rayTo.y, rayTo.z);
+		rayTestCB.setCollisionObject(null);
+		rayTestCB.setClosestHitFraction(1f);
+		rayTestCB.getRayFromWorld().setValue(rayFrom.x, rayFrom.y, rayFrom.z);
+		rayTestCB.getRayToWorld().setValue(rayTo.x, rayTo.y, rayTo.z);
 		
 		world.collisionWorld.rayTest(rayFrom, rayTo, rayTestCB);
 		
 		if (rayTestCB.hasHit()) {
-			final btCollisionObject obj = rayTestCB.getM_collisionObject();
+			final btCollisionObject obj = rayTestCB.getCollisionObject();
 			if (!obj.isStaticOrKinematicObject()) {
-				final btRigidBody body = btRigidBody.upcast(obj);
+				final btRigidBody body = (btRigidBody)(obj);
 				body.activate();
 				body.applyCentralImpulse(Vector3.tmp2.set(ray.direction).scl(20f));
 			}

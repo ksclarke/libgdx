@@ -18,7 +18,8 @@ package com.badlogic.gdx.tests.bullet;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.physics.bullet.ContactProcessedListenerByValue;
+import com.badlogic.gdx.physics.bullet.ContactCallbackEvent;
+import com.badlogic.gdx.physics.bullet.ContactListener;
 import com.badlogic.gdx.physics.bullet.btCollisionObject;
 import com.badlogic.gdx.physics.bullet.btManifoldPoint;
 import com.badlogic.gdx.physics.bullet.gdxBulletJNI;
@@ -29,23 +30,23 @@ public class ContactCallbackTest extends BaseBulletTest {
 	// ContactProcessedListenerXXX is called AFTER the contact is processed.
 	// Use ContactAddedListenerXXX to get a callback BEFORE the contact processed, 
 	// which allows you to alter the objects/manifold before it's processed. 
-	public static class TestContactProcessedListener extends ContactProcessedListenerByValue {
+	public static class TestContactProcessedListener extends ContactListener {
 		public Array<BulletEntity> entities;
 		int c = 0;
 		@Override
-		public void onContactProcessed (btManifoldPoint cp, int userValue0, boolean match0, int userValue1, boolean match1) {
+		public void onContactProcessed (int userValue0, boolean match0, int userValue1, boolean match1) {
 			if (match0) {
 				final BulletEntity e = (BulletEntity)(entities.get(userValue0));
 				// Disable future callbacks for this entity
 				e.body.setContactCallbackFilter(0);
-				e.color.set(Color.RED);
+				e.setColor(Color.RED);
 				Gdx.app.log("ContactCallbackTest", "Contact processed "+(++c));
 			}
 			if (match1) {
 				final BulletEntity e = (BulletEntity)(entities.get(userValue1));
 				// Disable future callbacks for this entity
 				e.body.setContactCallbackFilter(0);
-				e.color.set(Color.RED);
+				e.setColor(Color.RED);
 				Gdx.app.log("ContactCallbackTest", "Contact processed "+(++c));
 			}
 		}
@@ -59,8 +60,6 @@ public class ContactCallbackTest extends BaseBulletTest {
 	final float BOXOFFSET_Y = 0.5f;
 	final float BOXOFFSET_Z = -5f;
 	
-	protected BulletEntity ground;
-	
 	TestContactProcessedListener contactProcessedListener;
 	
 	@Override
@@ -68,14 +67,14 @@ public class ContactCallbackTest extends BaseBulletTest {
 		super.create();
 		
 		// Create the entities
-		(ground = world.add("ground", 0f, 0f, 0f))
-			.color.set(0.25f + 0.5f * (float)Math.random(), 0.25f + 0.5f * (float)Math.random(), 0.25f + 0.5f * (float)Math.random(), 1f);
+		world.add("ground", 0f, 0f, 0f)
+			.setColor(0.25f + 0.5f * (float)Math.random(), 0.25f + 0.5f * (float)Math.random(), 0.25f + 0.5f * (float)Math.random(), 1f);
 		
 		for (int x = 0; x < BOXCOUNT_X; x++) {
 			for (int y = 0; y < BOXCOUNT_Y; y++) {
 				for (int z = 0; z < BOXCOUNT_Z; z++) {
 					final BulletEntity e = (BulletEntity)world.add("box", BOXOFFSET_X + x * 2f, BOXOFFSET_Y + y * 2f, BOXOFFSET_Z + z * 2f);
-					e.color.set(0.5f + 0.5f * (float)Math.random(), 0.5f + 0.5f * (float)Math.random(), 0.5f + 0.5f * (float)Math.random(), 1f);
+					e.setColor(0.5f + 0.5f * (float)Math.random(), 0.5f + 0.5f * (float)Math.random(), 0.5f + 0.5f * (float)Math.random(), 1f);
 
 					e.body.setContactCallbackFlag(2);
 					e.body.setContactCallbackFilter(2);
@@ -98,9 +97,8 @@ public class ContactCallbackTest extends BaseBulletTest {
 	public void dispose () {
 		// Deleting the active contact listener, also disables that particular type of contact listener.
 		if (contactProcessedListener != null)
-			contactProcessedListener.delete();
+			contactProcessedListener.dispose();
 		contactProcessedListener = null;
 		super.dispose();
-		ground = null;
 	}
 }

@@ -71,17 +71,24 @@ public abstract class GwtApplication implements EntryPoint, Application {
 	private Array<Runnable> runnables = new Array<Runnable>();
 	private Array<Runnable> runnablesHelper = new Array<Runnable>();
 	private Array<LifecycleListener> lifecycleListeners = new Array<LifecycleListener>();
-	private int lastWidth, lastHeight;
-	private Preloader preloader;
+	private int lastWidth;
+	private int lastHeight;
+	Preloader preloader;
 	private static AgentInfo agentInfo;
 	private ObjectMap<String, Preferences> prefs = new ObjectMap<String, Preferences>();
 
 	/** @return the configuration for the {@link GwtApplication}. */
 	public abstract GwtApplicationConfiguration getConfig ();
 
+	
+	public String getPreloaderBaseURL()
+	{
+		return GWT.getHostPageBaseURL() + "assets/";
+	}
+	
 	@Override
 	public void onModuleLoad () {
-		this.agentInfo = computeAgentInfo();
+		GwtApplication.agentInfo = computeAgentInfo();
 		this.listener = getApplicationListener();
 		this.config = getConfig();
 		this.log = config.log;
@@ -112,42 +119,41 @@ public abstract class GwtApplication implements EntryPoint, Application {
 		}
 
 		// initialize SoundManager2
-		SoundManager.init(GWT.getModuleBaseURL(), 9);
+		SoundManager.init(GWT.getModuleBaseURL(), 9, true, new SoundManager.SoundManagerCallback(){
 
-		// wait for soundmanager to load, this is fugly, but for
-		// some reason the ontimeout and onerror callbacks are never
-		// called (function instanceof Function fails, wtf JS?).
-		new Timer() {
 			@Override
-			public void run () {
-				if (SoundManager.swfLoaded()) {
-					final PreloaderCallback callback = getPreloaderCallback();
-					preloader = new Preloader();
-					preloader.preload("assets.txt", new PreloaderCallback() {
-						@Override
-						public void error (String file) {
-							callback.error(file);
-						}
+			public void onready () {
+				final PreloaderCallback callback = getPreloaderCallback();
+				preloader = createPreloader();
+				preloader.preload("assets.txt", new PreloaderCallback() {
+					@Override
+					public void error (String file) {
+						callback.error(file);
+					}
 
-						@Override
-						public void update (PreloaderState state) {
-							callback.update(state);
-							if (state.hasEnded()) {
-								root.clear();
-								setupLoop();
-							}
+					@Override
+					public void update (PreloaderState state) {
+						callback.update(state);
+						if (state.hasEnded()) {
+							getRootPanel().clear();
+							setupLoop();
 						}
-					});
-					cancel();
-				}
+					}
+				});
 			}
-		}.scheduleRepeating(100);
+
+			@Override
+			public void ontimeout (String status, String errorType) {
+				error("SoundManager", status + " " + errorType);
+			}
+			
+		});
 	}
 
-	private void setupLoop () {
+	void setupLoop () {
 		// setup modules
-		try {
-			graphics = new GwtGraphics(root, config);
+		try {			
+			graphics = new GwtGraphics(root, config);			
 		} catch (Throwable e) {
 			root.clear();
 			root.add(new Label("Sorry, your browser doesn't seem to support WebGL"));
@@ -181,21 +187,7 @@ public abstract class GwtApplication implements EntryPoint, Application {
 			@Override
 			public void run () {
 				try {
-					graphics.update();
-					if (Gdx.graphics.getWidth() != lastWidth || Gdx.graphics.getHeight() != lastHeight) {
-						GwtApplication.this.listener.resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-						lastWidth = graphics.getWidth();
-						lastHeight = graphics.getHeight();
-						Gdx.gl.glViewport(0, 0, lastWidth, lastHeight);
-					}
-					runnablesHelper.addAll(runnables);
-					runnables.clear();
-					for (int i = 0; i < runnablesHelper.size; i++) {
-						runnablesHelper.get(i).run();
-					}
-					runnablesHelper.clear();					
-					listener.render();
-					input.justTouched = false;
+					mainLoop();
 				} catch (Throwable t) {
 					error("GwtApplication", "exception: " + t.getMessage(), t);
 					throw new RuntimeException(t);
@@ -204,11 +196,33 @@ public abstract class GwtApplication implements EntryPoint, Application {
 		}.scheduleRepeating((int)((1f / config.fps) * 1000));
 	}
 
+	void mainLoop() {
+		graphics.update();
+		if (Gdx.graphics.getWidth() != lastWidth || Gdx.graphics.getHeight() != lastHeight) {
+			GwtApplication.this.listener.resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+			lastWidth = graphics.getWidth();
+			lastHeight = graphics.getHeight();
+			Gdx.gl.glViewport(0, 0, lastWidth, lastHeight);
+		}
+		runnablesHelper.addAll(runnables);
+		runnables.clear();
+		for (int i = 0; i < runnablesHelper.size; i++) {
+			runnablesHelper.get(i).run();
+		}
+		runnablesHelper.clear();					
+		listener.render();
+		input.justTouched = false;
+	}
+	
 	public Panel getRootPanel () {
 		return root;
 	}
 
 	long loadStart = TimeUtils.nanoTime();
+
+	public Preloader createPreloader() {
+		return new Preloader(getPreloaderBaseURL());
+	}
 
 	public PreloaderCallback getPreloaderCallback () {
 		final Panel preloaderPanel = new VerticalPanel();
@@ -351,6 +365,11 @@ public abstract class GwtApplication implements EntryPoint, Application {
 	}
 
 	@Override
+	public int getLogLevel() {
+		return logLevel;
+	}
+
+	@Override
 	public ApplicationType getType () {
 		return ApplicationType.WebGL;
 	}
@@ -485,4 +504,8 @@ public abstract class GwtApplication implements EntryPoint, Application {
 			lifecycleListeners.removeValue(listener, true);
 		}		
 	}
+	
+	native static public void consoleLog(String message) /*-{
+		console.log( "GWT: " + message );
+	}-*/;
 }
