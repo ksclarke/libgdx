@@ -222,13 +222,13 @@ public class NativeCodeGenerator {
 
 		// check if source directory exists
 		if (!this.sourceDir.exists()) {
-			throw new Exception("Java source directory '" + this.sourceDir.file().getAbsolutePath() + "' does not exist");
+			throw new Exception("Java source directory '" + sourceDir + "' does not exist");
 		}
 
 		// generate jni directory if necessary
 		if (!this.jniDir.exists()) {
 			if (!this.jniDir.mkdirs()) {
-				throw new Exception("Couldn't create JNI directory '" + this.jniDir.file().getAbsolutePath() + "'");
+				throw new Exception("Couldn't create JNI directory '" + jniDir + "'");
 			}
 		}
 
