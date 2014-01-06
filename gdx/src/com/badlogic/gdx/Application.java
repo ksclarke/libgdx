@@ -99,7 +99,7 @@ public interface Application {
 	 * 
 	 * @author mzechner */
 	public enum ApplicationType {
-		Android, Desktop, Applet, WebGL, iOS
+		Android, Desktop, HeadlessDesktop, Applet, WebGL, iOS
 	}
 
 	public static final int LOG_NONE = 0;
@@ -129,7 +129,7 @@ public interface Application {
 	public void log (String tag, String message);
 
 	/** Logs a message to the console or logcat */
-	public void log (String tag, String message, Exception exception);
+	public void log (String tag, String message, Throwable exception);
 
 	/** Logs an error message to the console or logcat */
 	public void error (String tag, String message);

@@ -135,7 +135,7 @@ public class IOSApplication implements Application {
 		this.input = new IOSInput(this);
 		this.graphics = new IOSGraphics(getBounds(null), this, config, input, gl20);
 		this.files = new IOSFiles();
-		this.audio = new IOSAudio();
+		this.audio = new IOSAudio(config);
 		this.net = new IOSNet(this);
 
 		Gdx.files = this.files;
@@ -264,7 +264,7 @@ public class IOSApplication implements Application {
 	}
 
 	@Override
-	public void log (String tag, String message, Exception exception) {
+	public void log (String tag, String message, Throwable exception) {
 		if (logLevel > LOG_NONE) {
 			System.out.println("[info] " + tag + ": " + message);
 			exception.printStackTrace();

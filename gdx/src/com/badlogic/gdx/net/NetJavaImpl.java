@@ -16,11 +16,8 @@
 
 package com.badlogic.gdx.net;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
@@ -37,7 +34,6 @@ import com.badlogic.gdx.Net.HttpResponse;
 import com.badlogic.gdx.Net.HttpResponseListener;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 import com.badlogic.gdx.utils.StreamUtils;
-import com.badlogic.gdx.utils.StringBuilder;
 
 /** Implements part of the {@link Net} API using {@link HttpURLConnection}, to be easily reused between the Android and Desktop
  * backends.
@@ -67,14 +63,7 @@ public class NetJavaImpl {
 		@Override
 		public byte[] getResult () {
 			try {
-				int contentLength = connection.getContentLength();
-				ByteArrayOutputStream buffer;
-				if (contentLength > 0)
-					buffer = new OptimizedByteArrayOutputStream(contentLength);
-				else
-					buffer = new OptimizedByteArrayOutputStream();
-				StreamUtils.copyStream(inputStream, buffer);
-				return buffer.toByteArray();
+				return StreamUtils.copyStreamToByteArray(inputStream, connection.getContentLength());
 			} catch (IOException e) {
 				return StreamUtils.EMPTY_BYTES;
 			}
@@ -82,22 +71,10 @@ public class NetJavaImpl {
 
 		@Override
 		public String getResultAsString () {
-			BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
 			try {
-				int approxStringLength = connection.getContentLength();
-				StringBuilder b;
-				if (approxStringLength > 0)
-					b = new StringBuilder(approxStringLength);
-				else
-					b = new StringBuilder();
-				String line;
-				while ((line = reader.readLine()) != null)
-					b.append(line);
-				return b.toString();
+				return StreamUtils.copyStreamToString(inputStream, connection.getContentLength());
 			} catch (IOException e) {
 				return "";
-			} finally {
-				StreamUtils.closeQuietly(reader);
 			}
 		}
 
@@ -205,22 +182,6 @@ public class NetJavaImpl {
 		} catch (Exception e) {
 			httpResponseListener.failed(e);
 			return;
-		}
-	}
-
-	/** A ByteArrayOutputStream which avoids copying of the byte array if not necessary. */
-	static class OptimizedByteArrayOutputStream extends ByteArrayOutputStream {
-		OptimizedByteArrayOutputStream () {
-		}
-
-		OptimizedByteArrayOutputStream (int initialSize) {
-			super(initialSize);
-		}
-
-		@Override
-		public synchronized byte[] toByteArray () {
-			if (count == buf.length) return buf;
-			return super.toByteArray();
 		}
 	}
 }
