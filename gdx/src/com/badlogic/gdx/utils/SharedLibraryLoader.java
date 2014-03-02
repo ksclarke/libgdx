@@ -23,13 +23,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
+import java.util.UUID;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /** Loads shared libraries from a natives jar file (desktop) or arm folders (Android). For desktop projects, have the natives jar
  * in the classpath, for Android projects put the shared libraries in the libs/armeabi and libs/armeabi-v7a folders.
- * 
  * @author mzechner
  * @author Nathan Sweet */
 public class SharedLibraryLoader {
@@ -38,7 +38,12 @@ public class SharedLibraryLoader {
 	static public boolean isMac = System.getProperty("os.name").contains("Mac");
 	static public boolean isIos = false;
 	static public boolean isAndroid = false;
+	static public boolean isARM = System.getProperty("os.arch").startsWith("arm");
 	static public boolean is64Bit = System.getProperty("os.arch").equals("amd64");
+
+	// JDK 8 only.
+	static public String abi = (System.getProperty("sun.arch.abi") != null ? System.getProperty("sun.arch.abi") : "");
+
 	static {
 		String vm = System.getProperty("java.vm.name");
 		if (vm != null && vm.contains("Dalvik")) {
@@ -87,7 +92,7 @@ public class SharedLibraryLoader {
 	/** Maps a platform independent library name to a platform dependent name. */
 	public String mapLibraryName (String libraryName) {
 		if (isWindows) return libraryName + (is64Bit ? "64.dll" : ".dll");
-		if (isLinux) return "lib" + libraryName + (is64Bit ? "64.so" : ".so");
+		if (isLinux) return "lib" + libraryName + (isARM ? "arm" + abi : "") + (is64Bit ? "64.so" : ".so");
 		if (isMac) return "lib" + libraryName + ".dylib";
 		return libraryName;
 	}
@@ -181,16 +186,25 @@ public class SharedLibraryLoader {
 
 	/** Returns true if the parent directories of the file can be created and the file can be written. */
 	private boolean canWrite (File file) {
-		if (file.canWrite()) return true; // File exists and is writable.
 		File parent = file.getParentFile();
-		parent.mkdirs();
-		if (!parent.isDirectory()) return false;
+		File testFile;
+		if (file.exists()) {
+			if (!file.canWrite() || !file.canExecute()) return false;
+			// Don't overwrite existing file just to check if we can write to directory.
+			testFile = new File(parent, UUID.randomUUID().toString());
+		} else {
+			parent.mkdirs();
+			if (!parent.isDirectory()) return false;
+			testFile = file;
+		}
 		try {
-			new FileOutputStream(file).close();
-			file.delete();
+			new FileOutputStream(testFile).close();
+			if (!testFile.canExecute()) return false;
 			return true;
 		} catch (Throwable ex) {
 			return false;
+		} finally {
+			testFile.delete();
 		}
 	}
 

@@ -76,6 +76,14 @@ public class ObjectSet<T> implements Iterable<T> {
 		keyTable = (T[])new Object[capacity + stashCapacity];
 	}
 
+	/** Creates a new set identical to the specified set. */
+	public ObjectSet (ObjectSet set) {
+		this(set.capacity, set.loadFactor);
+		stashSize = set.stashSize;
+		System.arraycopy(set.keyTable, 0, keyTable, 0, set.keyTable.length);
+		size = set.size;
+	}
+
 	/** Returns true if the key was not already in the set. */
 	public boolean add (T key) {
 		if (key == null) throw new IllegalArgumentException("key cannot be null.");
@@ -132,7 +140,7 @@ public class ObjectSet<T> implements Iterable<T> {
 		addAll((T[])array.items, offset, length);
 	}
 
-	public void addAll (T[] array) {
+	public void addAll (T... array) {
 		addAll(array, 0, array.length);
 	}
 
@@ -345,6 +353,13 @@ public class ObjectSet<T> implements Iterable<T> {
 		return false;
 	}
 
+	public T first () {
+		T[] keyTable = this.keyTable;
+		for (int i = 0, n = capacity + stashSize; i < n; i++)
+			if (keyTable[i] != null) return keyTable[i];
+		throw new IllegalStateException("IntSet is empty.");
+	}
+
 	/** Increases the size of the backing array to acommodate the specified number of additional items. Useful before adding many
 	 * items to avoid multiple backing array resizes. */
 	public void ensureCapacity (int additionalCapacity) {
@@ -430,6 +445,12 @@ public class ObjectSet<T> implements Iterable<T> {
 		return iterator2;
 	}
 
+	static public <T> ObjectSet<T> with (T... array) {
+		ObjectSet set = new ObjectSet();
+		set.addAll(array);
+		return set;
+	}
+
 	static public class SetIterator<K> implements Iterable<K>, Iterator<K> {
 		public boolean hasNext;
 
@@ -463,6 +484,8 @@ public class ObjectSet<T> implements Iterable<T> {
 			if (currentIndex < 0) throw new IllegalStateException("next must be called before remove.");
 			if (currentIndex >= set.capacity) {
 				set.removeStashIndex(currentIndex);
+				nextIndex = currentIndex - 1;
+				findNextIndex();
 			} else {
 				set.keyTable[currentIndex] = null;
 			}
