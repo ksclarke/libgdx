@@ -43,7 +43,7 @@ public final class Blob {
 				if (pos == length()) return -1;
 				return get(pos++) & 0xff;
 			}
-			
+
 			@Override
 			public int available () {
 				return length() - pos;
@@ -80,6 +80,6 @@ public final class Blob {
 		return encoded.toString();
 	}
 
-	private final Int8Array data;
+	protected final Int8Array data;
 
 }

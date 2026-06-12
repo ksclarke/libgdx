@@ -17,7 +17,7 @@
 package com.badlogic.gdx.math;
 
 /** Encapsulates a 2D polygon defined by it's vertices relative to an origin point (default of 0, 0). */
-public class Polygon {
+public class Polygon implements Shape2D {
 	private float[] localVertices;
 	private float[] worldVertices;
 	private float x, y;
@@ -108,22 +108,26 @@ public class Polygon {
 		dirty = true;
 	}
 
-	/** Sets the polygon's local vertices relative to the origin point, without any scaling, rotating or translations being applied.
+	/** Sets the polygon's local vertices relative to the origin point, without any scaling, rotating or translations being
+	 * applied.
 	 * 
 	 * @param vertices float array where every even element represents the x-coordinate of a vertex, and the proceeding element
 	 *           representing the y-coordinate.
 	 * @throws IllegalArgumentException if less than 6 elements, representing 3 points, are provided */
 	public void setVertices (float[] vertices) {
 		if (vertices.length < 6) throw new IllegalArgumentException("polygons must contain at least 3 points.");
+		localVertices = vertices;
+		dirty = true;
+	}
 
-		// if the provided vertices are the same length, we can copy them into localVertices
-		if (localVertices.length == vertices.length) {
-			for (int i = 0; i < localVertices.length; i++) {
-				localVertices[i] = vertices[i];
-			}
-		} else {
-			localVertices = vertices;
-		}
+	/** Set vertex position
+	 * @param vertexNum min=0, max=vertices.length/2-1
+	 * @throws IllegalArgumentException if vertex doesnt exist */
+	public void setVertex (int vertexNum, float x, float y) {
+		if (vertexNum < 0 || vertexNum > localVertices.length / 2 - 1)
+			throw new IllegalArgumentException("the vertex " + vertexNum + " doesn't exist");
+		localVertices[2 * vertexNum] = x;
+		localVertices[2 * vertexNum + 1] = y;
 		dirty = true;
 	}
 
@@ -160,7 +164,8 @@ public class Polygon {
 		dirty = true;
 	}
 
-	/** Sets the polygon's world vertices to be recalculated when calling {@link #getTransformedVertices() getTransformedVertices}. */
+	/** Sets the polygon's world vertices to be recalculated when calling {@link #getTransformedVertices()
+	 * getTransformedVertices}. */
 	public void dirty () {
 		dirty = true;
 	}
@@ -169,6 +174,23 @@ public class Polygon {
 	public float area () {
 		float[] vertices = getTransformedVertices();
 		return GeometryUtils.polygonArea(vertices, 0, vertices.length);
+	}
+
+	public int getVertexCount () {
+		return this.localVertices.length / 2;
+	}
+
+	/** @return Position(transformed) of vertex */
+	public Vector2 getVertex (int vertexNum, Vector2 pos) {
+		if (vertexNum < 0 || vertexNum > getVertexCount())
+			throw new IllegalArgumentException("the vertex " + vertexNum + " doesn't exist");
+		float[] vertices = this.getTransformedVertices();
+		return pos.set(vertices[2 * vertexNum], vertices[2 * vertexNum + 1]);
+	}
+
+	public Vector2 getCentroid (Vector2 centroid) {
+		float[] vertices = getTransformedVertices();
+		return GeometryUtils.polygonCentroid(vertices, 0, vertices.length, centroid);
 	}
 
 	/** Returns an axis-aligned bounding box of this polygon.
@@ -202,6 +224,7 @@ public class Polygon {
 	}
 
 	/** Returns whether an x, y pair is contained within the polygon. */
+	@Override
 	public boolean contains (float x, float y) {
 		final float[] vertices = getTransformedVertices();
 		final int numFloats = vertices.length;
@@ -215,6 +238,11 @@ public class Polygon {
 			if (((y1 <= y && y < y2) || (y2 <= y && y < y1)) && x < ((x2 - x1) / (y2 - y1) * (y - y1) + x1)) intersects++;
 		}
 		return (intersects & 1) == 1;
+	}
+
+	@Override
+	public boolean contains (Vector2 point) {
+		return contains(point.x, point.y);
 	}
 
 	/** Returns the x-coordinate of the polygon's position within the world. */
@@ -250,5 +278,16 @@ public class Polygon {
 	/** Returns the total vertical scaling applied to the polygon. */
 	public float getScaleY () {
 		return scaleY;
+	}
+
+	public void resetTransformations () {
+		scaleX = 1;
+		scaleY = 1;
+		originX = 0;
+		originY = 0;
+		x = 0;
+		y = 0;
+		rotation = 0;
+		dirty = true;
 	}
 }

@@ -16,9 +16,6 @@
 
 package com.badlogic.gdx.utils.reflect;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Modifier;
-
 import com.badlogic.gwtref.client.Parameter;
 
 /** Provides information about, and access to, a single method on a class or interface.
@@ -116,6 +113,44 @@ public final class Method {
 		} catch (IllegalArgumentException e) {
 			throw new ReflectionException("Illegal argument(s) supplied to method: " + getName(), e);
 		}
+	}
+
+	/** Returns true if the method includes an annotation of the provided class type. */
+	public boolean isAnnotationPresent (Class<? extends java.lang.annotation.Annotation> annotationType) {
+		java.lang.annotation.Annotation[] annotations = method.getDeclaredAnnotations();
+		if (annotations != null) {
+			for (java.lang.annotation.Annotation annotation : annotations) {
+				if (annotation.annotationType().equals(annotationType)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/** Returns an array of {@link Annotation} objects reflecting all annotations declared by this method, or an empty array if
+	 * there are none. Does not include inherited annotations. Does not include parameter annotations. */
+	public Annotation[] getDeclaredAnnotations () {
+		java.lang.annotation.Annotation[] annotations = method.getDeclaredAnnotations();
+		if (annotations == null) return new Annotation[0];
+		Annotation[] result = new Annotation[annotations.length];
+		for (int i = 0; i < annotations.length; i++) {
+			result[i] = new Annotation(annotations[i]);
+		}
+		return result;
+	}
+
+	/** Returns an {@link Annotation} object reflecting the annotation provided, or null of this method doesn't have such an
+	 * annotation. This is a convenience function if the caller knows already which annotation type he's looking for. */
+	public Annotation getDeclaredAnnotation (Class<? extends java.lang.annotation.Annotation> annotationType) {
+		java.lang.annotation.Annotation[] annotations = method.getDeclaredAnnotations();
+		if (annotations == null) return null;
+		for (java.lang.annotation.Annotation annotation : annotations) {
+			if (annotation.annotationType().equals(annotationType)) {
+				return new Annotation(annotation);
+			}
+		}
+		return null;
 	}
 
 }

@@ -59,9 +59,9 @@ class TimSort<T> {
 	/** When we get into galloping mode, we stay there until both runs win less often than MIN_GALLOP consecutive times. */
 	private static final int MIN_GALLOP = 7;
 
-	/** This controls when we get *into* galloping mode. It is initialized to MIN_GALLOP. The mergeLo and mergeHi methods nudge it
-	 * higher for random data, and lower for highly structured data. */
-	private int minGallop = MIN_GALLOP;
+	/** This controls when we get *into* galloping mode. It is reset to MIN_GALLOP before each sort. The mergeLo and mergeHi
+	 * methods nudge it higher for random data, and lower for highly structured data. */
+	private int minGallop;
 
 	/** Maximum initial size of tmp array, which is used for merging. The array can grow to accommodate demand.
 	 * 
@@ -83,8 +83,8 @@ class TimSort<T> {
 	private final int[] runBase;
 	private final int[] runLen;
 
-	/** Asserts have been placed in if-statements for performace. To enable them, set this field to true and enable them in VM with
-	 * a command line flag. If you modify this class, please do test the asserts! */
+	/** Asserts have been placed in if-statements for performance. To enable them, set this field to true and enable them in VM
+	 * with a command line flag. If you modify this class, please do test the asserts! */
 	private static final boolean DEBUG = false;
 
 	TimSort () {
@@ -108,41 +108,41 @@ class TimSort<T> {
 
 		this.a = a;
 		this.c = c;
+		minGallop = MIN_GALLOP;
 		tmpCount = 0;
+		try {
+			/** March over the array once, left to right, finding natural runs, extending short natural runs to minRun elements, and
+			 * merging runs to maintain stack invariant. */
+			int minRun = minRunLength(nRemaining);
+			do {
+				// Identify next run
+				int runLen = countRunAndMakeAscending(a, lo, hi, c);
 
-		/** March over the array once, left to right, finding natural runs, extending short natural runs to minRun elements, and
-		 * merging runs to maintain stack invariant. */
-		int minRun = minRunLength(nRemaining);
-		do {
-			// Identify next run
-			int runLen = countRunAndMakeAscending(a, lo, hi, c);
+				// If run is short, extend to min(minRun, nRemaining)
+				if (runLen < minRun) {
+					int force = nRemaining <= minRun ? nRemaining : minRun;
+					binarySort(a, lo, lo + force, lo + runLen, c);
+					runLen = force;
+				}
 
-			// If run is short, extend to min(minRun, nRemaining)
-			if (runLen < minRun) {
-				int force = nRemaining <= minRun ? nRemaining : minRun;
-				binarySort(a, lo, lo + force, lo + runLen, c);
-				runLen = force;
-			}
+				// Push run onto pending-run stack, and maybe merge
+				pushRun(lo, runLen);
+				mergeCollapse();
 
-			// Push run onto pending-run stack, and maybe merge
-			pushRun(lo, runLen);
-			mergeCollapse();
+				// Advance to find next run
+				lo += runLen;
+				nRemaining -= runLen;
+			} while (nRemaining != 0);
 
-			// Advance to find next run
-			lo += runLen;
-			nRemaining -= runLen;
-		} while (nRemaining != 0);
-
-		// Merge all remaining runs to complete sort
-		if (DEBUG) assert lo == hi;
-		mergeForceCollapse();
-		if (DEBUG) assert stackSize == 1;
-
-		this.a = null;
-		this.c = null;
-		T[] tmp = this.tmp;
-		for (int i = 0, n = tmpCount; i < n; i++)
-			tmp[i] = null;
+			// Merge all remaining runs to complete sort
+			if (DEBUG) assert lo == hi;
+			mergeForceCollapse();
+			if (DEBUG) assert stackSize == 1;
+		} finally {
+			this.a = null;
+			this.c = null;
+			Arrays.fill(tmp, 0, tmpCount, null);
+		}
 	}
 
 	/** Creates a TimSort instance to maintain the state of an ongoing sort.
@@ -152,6 +152,7 @@ class TimSort<T> {
 	private TimSort (T[] a, Comparator<? super T> c) {
 		this.a = a;
 		this.c = c;
+		minGallop = MIN_GALLOP;
 
 		// Allocate temp storage (which may be increased later if necessary)
 		int len = a.length;
@@ -263,7 +264,7 @@ class TimSort<T> {
 			/*
 			 * The invariants still hold: pivot >= all in [lo, left) and pivot < all in [left, start), so pivot belongs at left. Note
 			 * that if there are elements equal to pivot, left points to the first slot after them -- that's why this sort is stable.
-			 * Slide elements over to make room to make room for pivot.
+			 * Slide elements over to make room for pivot.
 			 */
 			int n = start - left; // The number of elements to move
 			// Switch is just an optimization for arraycopy in default case
@@ -366,21 +367,25 @@ class TimSort<T> {
 
 	/** Examines the stack of runs waiting to be merged and merges adjacent runs until the stack invariants are reestablished:
 	 * 
-	 * 1. runLen[i - 3] > runLen[i - 2] + runLen[i - 1] 2. runLen[i - 2] > runLen[i - 1]
+	 * 1. runLen[n - 2] > runLen[n - 1] + runLen[n] 2. runLen[n - 1] > runLen[n]
+	 * 
+	 * where n is the index of the last run in runLen.
+	 * 
+	 * This method has been formally verified to be correct after checking the last 4 runs. Checking for 3 runs results in an
+	 * exception for large arrays. (Source:
+	 * http://envisage-project.eu/proving-android-java-and-python-sorting-algorithm-is-broken-and-how-to-fix-it/)
 	 * 
 	 * This method is called each time a new run is pushed onto the stack, so the invariants are guaranteed to hold for i <
 	 * stackSize upon entry to the method. */
 	private void mergeCollapse () {
 		while (stackSize > 1) {
 			int n = stackSize - 2;
-			if (n > 0 && runLen[n - 1] <= runLen[n] + runLen[n + 1]) {
+			if ((n >= 1 && runLen[n - 1] <= runLen[n] + runLen[n + 1]) || (n >= 2 && runLen[n - 2] <= runLen[n] + runLen[n - 1])) {
 				if (runLen[n - 1] < runLen[n + 1]) n--;
-				mergeAt(n);
-			} else if (runLen[n] <= runLen[n + 1]) {
-				mergeAt(n);
-			} else {
+			} else if (runLen[n] > runLen[n + 1]) {
 				break; // Invariant is established
 			}
+			mergeAt(n);
 		}
 	}
 
@@ -612,7 +617,7 @@ class TimSort<T> {
 		}
 
 		Comparator<? super T> c = this.c; // Use local variable for performance
-		int minGallop = this.minGallop; // "    " "     " "
+		int minGallop = this.minGallop; // " " " " "
 		outer:
 		while (true) {
 			int count1 = 0; // Number of times in a row that first run won
@@ -718,7 +723,7 @@ class TimSort<T> {
 		}
 
 		Comparator<? super T> c = this.c; // Use local variable for performance
-		int minGallop = this.minGallop; // "    " "     " "
+		int minGallop = this.minGallop; // " " " " "
 		outer:
 		while (true) {
 			int count1 = 0; // Number of times in a row that first run won

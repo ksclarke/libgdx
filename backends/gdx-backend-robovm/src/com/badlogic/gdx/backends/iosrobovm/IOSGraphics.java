@@ -1,12 +1,12 @@
 /*******************************************************************************
  * Copyright 2011 See AUTHORS file.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,101 +16,50 @@
 
 package com.badlogic.gdx.backends.iosrobovm;
 
-import org.robovm.cocoatouch.coregraphics.CGPoint;
-import org.robovm.cocoatouch.coregraphics.CGRect;
-import org.robovm.cocoatouch.coregraphics.CGSize;
-import org.robovm.cocoatouch.foundation.NSObject;
-import org.robovm.cocoatouch.foundation.NSSet;
-import org.robovm.cocoatouch.glkit.GLKView;
-import org.robovm.cocoatouch.glkit.GLKViewController;
-import org.robovm.cocoatouch.glkit.GLKViewControllerDelegate;
-import org.robovm.cocoatouch.glkit.GLKViewDelegate;
-import org.robovm.cocoatouch.glkit.GLKViewDrawableColorFormat;
-import org.robovm.cocoatouch.glkit.GLKViewDrawableDepthFormat;
-import org.robovm.cocoatouch.glkit.GLKViewDrawableMultisample;
-import org.robovm.cocoatouch.glkit.GLKViewDrawableStencilFormat;
-import org.robovm.cocoatouch.opengles.EAGLContext;
-import org.robovm.cocoatouch.opengles.EAGLRenderingAPI;
-import org.robovm.cocoatouch.uikit.UIDevice;
-import org.robovm.cocoatouch.uikit.UIEvent;
-import org.robovm.cocoatouch.uikit.UIInterfaceOrientation;
-import org.robovm.cocoatouch.uikit.UIScreen;
-import org.robovm.cocoatouch.uikit.UIUserInterfaceIdiom;
-import org.robovm.objc.Selector;
-import org.robovm.objc.annotation.BindSelector;
-import org.robovm.rt.bro.annotation.Callback;
-
+import com.badlogic.gdx.AbstractGraphics;
+import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Graphics;
 import com.badlogic.gdx.LifecycleListener;
-import com.badlogic.gdx.graphics.GL10;
-import com.badlogic.gdx.graphics.GL11;
+import com.badlogic.gdx.backends.iosrobovm.custom.HWMachine;
+import com.badlogic.gdx.graphics.Cursor;
+import com.badlogic.gdx.graphics.Cursor.SystemCursor;
 import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.GLCommon;
+import com.badlogic.gdx.graphics.GL30;
+import com.badlogic.gdx.graphics.GL31;
+import com.badlogic.gdx.graphics.GL32;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.glutils.GLVersion;
+import com.badlogic.gdx.graphics.glutils.HdpiMode;
 import com.badlogic.gdx.utils.Array;
 
-// FIXME add GL 1.x support by ripping Android's classes
-public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, GLKViewControllerDelegate {
+import org.robovm.apple.coregraphics.CGRect;
+import org.robovm.apple.foundation.NSObject;
+import org.robovm.apple.glkit.GLKView;
+import org.robovm.apple.glkit.GLKViewController;
+import org.robovm.apple.glkit.GLKViewControllerDelegate;
+import org.robovm.apple.glkit.GLKViewDelegate;
+import org.robovm.apple.glkit.GLKViewDrawableColorFormat;
+import org.robovm.apple.glkit.GLKViewDrawableDepthFormat;
+import org.robovm.apple.glkit.GLKViewDrawableMultisample;
+import org.robovm.apple.glkit.GLKViewDrawableStencilFormat;
+import org.robovm.apple.opengles.EAGLContext;
+import org.robovm.apple.opengles.EAGLRenderingAPI;
+import org.robovm.apple.uikit.UIEdgeInsets;
+import org.robovm.apple.uikit.UIEvent;
+import org.robovm.apple.uikit.UIScreen;
+import org.robovm.objc.annotation.Method;
+import org.robovm.rt.bro.annotation.Pointer;
+
+public class IOSGraphics extends AbstractGraphics {
 
 	private static final String tag = "IOSGraphics";
-
-	static class IOSUIViewController extends GLKViewController {
-		final IOSApplication app;
-		final IOSGraphics graphics;
-		boolean created = false;
-
-		IOSUIViewController (IOSApplication app, IOSGraphics graphics) {
-			this.app = app;
-			this.graphics = graphics;
-		}
-
-		@Override
-		public void didRotate (UIInterfaceOrientation orientation) {
-			super.didRotate(orientation);
-			// get the view size and update graphics
-			// FIXME: supporting BOTH (landscape+portrait at same time) is
-			// currently not working correctly (needs fix)
-			// FIXME screen orientation needs to be stored for
-			// Input#getNativeOrientation
-			CGSize bounds = app.getBounds(this);
-			graphics.width = (int)bounds.width();
-			graphics.height = (int)bounds.height();
-			graphics.makeCurrent();
-			app.listener.resize(graphics.width, graphics.height);
-		}
-
-		public boolean shouldAutorotateToInterfaceOrientation (UIInterfaceOrientation orientation) {
-			// we return "true" if we support the orientation
-			switch (orientation) {
-			case LandscapeLeft:
-			case LandscapeRight:
-				return app.config.orientationLandscape;
-			default:
-				// assume portrait
-				return app.config.orientationPortrait;
-			}
-		}
-
-		@Callback
-		@BindSelector("shouldAutorotateToInterfaceOrientation:")
-		private static boolean shouldAutorotateToInterfaceOrientation (IOSUIViewController self, Selector sel,
-			UIInterfaceOrientation orientation) {
-			return self.shouldAutorotateToInterfaceOrientation(orientation);
-		}
-	}
-
-	static class IOSUIView extends GLKView {
-
-		public IOSUIView (CGRect frame, EAGLContext context) {
-			super(frame, context);
-		}
-	}
 
 	IOSApplication app;
 	IOSInput input;
 	GL20 gl20;
-	int width;
-	int height;
+	GL30 gl30;
+	IOSScreenBounds screenBounds;
+	int safeInsetLeft, safeInsetTop, safeInsetBottom, safeInsetRight;
 	long lastFrameTime;
 	float deltaTime;
 	long framesStart;
@@ -125,46 +74,59 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 	private float ppcY = 0;
 	private float density = 1;
 
-	volatile boolean paused;
+	volatile boolean resume = false;
+	volatile boolean appPaused;
+	private long frameId = -1;
+	private boolean isContinuous = true;
+	private boolean isFrameRequested = true;
+
+	private boolean firstFrame = true;
 
 	IOSApplicationConfiguration config;
 	EAGLContext context;
+	GLVersion glVersion;
 	GLKView view;
 	IOSUIViewController viewController;
 
-	public IOSGraphics (CGSize bounds, IOSApplication app, IOSApplicationConfiguration config, IOSInput input, GL20 gl20) {
+	public IOSGraphics (IOSApplication app, IOSApplicationConfiguration config, IOSInput input, boolean useGLES30) {
 		this.config = config;
+
 		// setup view and OpenGL
-		width = (int)bounds.width();
-		height = (int)bounds.height();
-		app.debug(tag, bounds.width() + "x" + bounds.height() + ", " + UIScreen.getMainScreen().getScale());
-		this.gl20 = gl20;
+		screenBounds = app.computeBounds();
 
-		context = new EAGLContext(EAGLRenderingAPI.OpenGLES2);
+		if (useGLES30) {
+			context = new EAGLContext(EAGLRenderingAPI.OpenGLES3);
+			if (context != null)
+				gl20 = gl30 = new IOSGLES30();
+			else
+				Gdx.app.log("IOGraphics", "OpenGL ES 3.0 not supported, falling back on 2.0");
+		}
+		if (context == null) {
+			context = new EAGLContext(EAGLRenderingAPI.OpenGLES2);
+			gl20 = new IOSGLES20();
+			gl30 = null;
+		}
 
-		view = new GLKView(new CGRect(new CGPoint(0, 0), bounds), context) {
-			@Override
-			public void touchesBegan (NSSet touches, UIEvent event) {
-				super.touchesBegan(touches, event);
-				IOSGraphics.this.input.touchDown(touches, event);
+		IOSViewDelegate viewDelegate = new IOSViewDelegate();
+		view = new GLKView(new CGRect(0, 0, screenBounds.width, screenBounds.height), context) {
+			@Method(selector = "touchesBegan:withEvent:")
+			public void touchesBegan (@Pointer long touches, UIEvent event) {
+				IOSGraphics.this.input.onTouch(touches);
 			}
 
-			@Override
-			public void touchesCancelled (NSSet touches, UIEvent event) {
-				super.touchesCancelled(touches, event);
-				IOSGraphics.this.input.touchUp(touches, event);
+			@Method(selector = "touchesCancelled:withEvent:")
+			public void touchesCancelled (@Pointer long touches, UIEvent event) {
+				IOSGraphics.this.input.onTouch(touches);
 			}
 
-			@Override
-			public void touchesEnded (NSSet touches, UIEvent event) {
-				super.touchesEnded(touches, event);
-				IOSGraphics.this.input.touchUp(touches, event);
+			@Method(selector = "touchesEnded:withEvent:")
+			public void touchesEnded (@Pointer long touches, UIEvent event) {
+				IOSGraphics.this.input.onTouch(touches);
 			}
 
-			@Override
-			public void touchesMoved (NSSet touches, UIEvent event) {
-				super.touchesMoved(touches, event);
-				IOSGraphics.this.input.touchMoved(touches, event);
+			@Method(selector = "touchesMoved:withEvent:")
+			public void touchesMoved (@Pointer long touches, UIEvent event) {
+				IOSGraphics.this.input.onTouch(touches);
 			}
 
 			@Override
@@ -173,23 +135,29 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 			}
 
 		};
-		view.setDelegate(this);
+		view.setDelegate(viewDelegate);
 		view.setDrawableColorFormat(config.colorFormat);
 		view.setDrawableDepthFormat(config.depthFormat);
 		view.setDrawableStencilFormat(config.stencilFormat);
 		view.setDrawableMultisample(config.multisample);
 		view.setMultipleTouchEnabled(true);
 
-		viewController = new IOSUIViewController(app, this);
+		viewController = app.createUIViewController(this);
 		viewController.setView(view);
-		viewController.setDelegate(this);
-		viewController.setPreferredFramesPerSecond(config.preferredFramesPerSecond);
+		viewController.setDelegate(viewDelegate);
+
+		int preferredFps;
+		int maxSupportedFPS = (int)(UIScreen.getMainScreen().getMaximumFramesPerSecond());
+		if (config.preferredFramesPerSecond == 0) {
+			preferredFps = maxSupportedFPS;
+		} else {
+			preferredFps = Math.min(config.preferredFramesPerSecond, maxSupportedFPS);
+		}
+		viewController.setPreferredFramesPerSecond(preferredFps);
 
 		this.app = app;
 		this.input = input;
 
-		// FIXME fix this if we add rgba/depth/stencil flags to
-		// IOSApplicationConfiguration
 		int r = 0, g = 0, b = 0, a = 0, depth = 0, stencil = 0, samples = 0;
 		if (config.colorFormat == GLKViewDrawableColorFormat.RGB565) {
 			r = 5;
@@ -199,39 +167,26 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 		} else {
 			r = g = b = a = 8;
 		}
-		if (config.depthFormat == GLKViewDrawableDepthFormat.Format16) {
+		if (config.depthFormat == GLKViewDrawableDepthFormat._16) {
 			depth = 16;
-		} else if (config.depthFormat == GLKViewDrawableDepthFormat.Format24) {
+		} else if (config.depthFormat == GLKViewDrawableDepthFormat._24) {
 			depth = 24;
 		} else {
 			depth = 0;
 		}
-		if (config.stencilFormat == GLKViewDrawableStencilFormat.Format8) {
+		if (config.stencilFormat == GLKViewDrawableStencilFormat._8) {
 			stencil = 8;
 		}
-		if (config.multisample == GLKViewDrawableMultisample.Sample4X) {
+		if (config.multisample == GLKViewDrawableMultisample._4X) {
 			samples = 4;
 		}
 		bufferFormat = new BufferFormat(r, g, b, a, depth, stencil, samples, false);
-		this.gl20 = gl20;
 
-		// determine display density and PPI (PPI values via Wikipedia!)
-		density = 1f;
-
-		// if ((UIScreen.getMainScreen().respondsToSelector(new
-		// Selector("scale")))) {
-		float scale = UIScreen.getMainScreen().getScale();
-		app.debug(tag, "Calculating density, UIScreen.mainScreen.scale: " + scale);
-		if (scale == 2f) density = 2f;
-
-		int ppi;
-		if (UIDevice.getCurrentDevice().getUserInterfaceIdiom() == UIUserInterfaceIdiom.Pad) {
-			// iPad
-			ppi = Math.round(density * 132);
-		} else {
-			// iPhone or iPodTouch
-			ppi = Math.round(density * 163);
-		}
+		String machineString = HWMachine.getMachineString();
+		IOSDevice device = config.knownDevices.get(machineString);
+		if (device == null) app.error(tag, "Machine ID: " + machineString + " not found, please report to libGDX");
+		int ppi = device != null ? device.ppi : app.guessUnknownPpi();
+		density = ppi / 160f;
 		ppiX = ppi;
 		ppiY = ppi;
 		ppcX = ppiX / 2.54f;
@@ -242,12 +197,22 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 		lastFrameTime = System.nanoTime();
 		framesStart = lastFrameTime;
 
-		paused = false;
+		// enable OpenGL
+		makeCurrent();
+		// OpenGL glViewport() function expects backbuffer coordinates instead of logical coordinates
+		gl20.glViewport(0, 0, screenBounds.backBufferWidth, screenBounds.backBufferHeight);
+
+		String versionString = gl20.glGetString(GL20.GL_VERSION);
+		String vendorString = gl20.glGetString(GL20.GL_VENDOR);
+		String rendererString = gl20.glGetString(GL20.GL_RENDERER);
+		glVersion = new GLVersion(Application.ApplicationType.iOS, versionString, vendorString, rendererString);
+
+		appPaused = false;
 	}
 
 	public void resume () {
-		if (!paused) return;
-		paused = false;
+		if (!appPaused) return;
+		appPaused = false;
 
 		Array<LifecycleListener> listeners = app.lifecycleListeners;
 		synchronized (listeners) {
@@ -255,13 +220,14 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 				listener.resume();
 			}
 		}
+		resume = true;
 		app.listener.resume();
 	}
 
 	public void pause () {
-		if (paused) return;
-		paused = true;
-		
+		if (appPaused) return;
+		appPaused = true;
+
 		Array<LifecycleListener> listeners = app.lifecycleListeners;
 		synchronized (listeners) {
 			for (LifecycleListener listener : listeners) {
@@ -271,22 +237,31 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 		app.listener.pause();
 	}
 
-	boolean created = false;
-
-	@Override
 	public void draw (GLKView view, CGRect rect) {
-		if (!created) {
-			app.graphics.makeCurrent();
-			app.listener.create();
-			app.listener.resize(width, height);
-			created = true;
+		makeCurrent();
+		// massive hack, GLKView resets the viewport on each draw call, so IOSGLES20
+		// stores the last known viewport and we reset it here...
+		gl20.glViewport(IOSGLES20.x, IOSGLES20.y, IOSGLES20.width, IOSGLES20.height);
+
+		// For default framebuffer, we render a dummy frame during initialization before create
+		// Return early so listener does not process
+		if (firstFrame) {
+			firstFrame = false;
+			return;
 		}
-		if (paused) {
+
+		if (appPaused) {
 			return;
 		}
 
 		long time = System.nanoTime();
-		deltaTime = (time - lastFrameTime) / 1000000000.0f;
+		if (lastFrameTime > time) lastFrameTime = time;
+		if (!resume) {
+			deltaTime = (time - lastFrameTime) / 1000000000.0f;
+		} else {
+			resume = false;
+			deltaTime = 0;
+		}
 		lastFrameTime = time;
 
 		frames++;
@@ -296,8 +271,8 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 			frames = 0;
 		}
 
-		makeCurrent();
 		input.processEvents();
+		frameId++;
 		app.listener.render();
 	}
 
@@ -305,46 +280,18 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 		EAGLContext.setCurrentContext(context);
 	}
 
-	@Override
 	public void update (GLKViewController controller) {
 		makeCurrent();
 		app.processRunnables();
-	}
-
-	@Override
-	public void willPause (GLKViewController controller, boolean pause) {
-		if (pause) {
-			if (paused) return;
-			pause();
-		} else {
-			if (!paused) return;
-			resume();
+		// pause the GLKViewController render loop if we are no longer continuous
+		// and if we haven't requested a frame in the last loop iteration
+		if (!isContinuous && !isFrameRequested) {
+			viewController.setPaused(true);
 		}
+		isFrameRequested = false;
 	}
 
-	@Override
-	public boolean isGL11Available () {
-		return false;
-	}
-
-	@Override
-	public boolean isGL20Available () {
-		return true;
-	}
-
-	@Override
-	public GLCommon getGLCommon () {
-		return gl20;
-	}
-
-	@Override
-	public GL10 getGL10 () {
-		return null;
-	}
-
-	@Override
-	public GL11 getGL11 () {
-		return null;
+	public void willPause (GLKViewController controller, boolean pause) {
 	}
 
 	@Override
@@ -353,22 +300,101 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 	}
 
 	@Override
+	public void setGL20 (GL20 gl20) {
+		this.gl20 = gl20;
+		if (gl30 == null) {
+			Gdx.gl = gl20;
+			Gdx.gl20 = gl20;
+		}
+	}
+
+	@Override
+	public boolean isGL30Available () {
+		return gl30 != null;
+	}
+
+	@Override
+	public GL30 getGL30 () {
+		return gl30;
+	}
+
+	@Override
+	public void setGL30 (GL30 gl30) {
+		this.gl30 = gl30;
+		if (gl30 != null) {
+			this.gl20 = gl30;
+
+			Gdx.gl = gl20;
+			Gdx.gl20 = gl20;
+			Gdx.gl30 = gl30;
+		}
+	}
+
+	@Override
+	public boolean isGL31Available () {
+		return false;
+	}
+
+	@Override
+	public GL31 getGL31 () {
+		return null;
+	}
+
+	@Override
+	public void setGL31 (GL31 gl31) {
+
+	}
+
+	@Override
+	public boolean isGL32Available () {
+		return false;
+	}
+
+	@Override
+	public GL32 getGL32 () {
+		return null;
+	}
+
+	@Override
+	public void setGL32 (GL32 gl32) {
+
+	}
+
+	@Override
 	public int getWidth () {
-		return width;
+		if (config.hdpiMode == HdpiMode.Pixels) {
+			return getBackBufferWidth();
+		} else {
+			return screenBounds.width;
+		}
 	}
 
 	@Override
 	public int getHeight () {
-		return height;
+		if (config.hdpiMode == HdpiMode.Pixels) {
+			return getBackBufferHeight();
+		} else {
+			return screenBounds.height;
+		}
+	}
+
+	@Override
+	public int getBackBufferWidth () {
+		return screenBounds.backBufferWidth;
+	}
+
+	@Override
+	public int getBackBufferHeight () {
+		return screenBounds.backBufferHeight;
+	}
+
+	@Override
+	public float getBackBufferScale () {
+		return app.pixelsPerPoint;
 	}
 
 	@Override
 	public float getDeltaTime () {
-		return deltaTime;
-	}
-
-	@Override
-	public float getRawDeltaTime () {
 		return deltaTime;
 	}
 
@@ -380,6 +406,11 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 	@Override
 	public GraphicsType getType () {
 		return GraphicsType.iOSGL;
+	}
+
+	@Override
+	public GLVersion getGLVersion () {
+		return glVersion;
 	}
 
 	@Override
@@ -402,9 +433,6 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 		return ppcY;
 	}
 
-	/** Returns the display density.
-	 * 
-	 * @return 1.0f for non-retina devices, 2.0f for retina devices. */
 	@Override
 	public float getDensity () {
 		return density;
@@ -417,28 +445,86 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 
 	@Override
 	public DisplayMode[] getDisplayModes () {
-		return new DisplayMode[] {getDesktopDisplayMode()};
+		return new DisplayMode[] {getDisplayMode()};
 	}
 
 	@Override
-	public DisplayMode getDesktopDisplayMode () {
-		return new IOSDisplayMode(getWidth(), getHeight(), config.preferredFramesPerSecond, bufferFormat.r + bufferFormat.g
-			+ bufferFormat.b + bufferFormat.a);
+	public DisplayMode getDisplayMode () {
+		return new IOSDisplayMode(getWidth(), getHeight(), (int)(viewController.getPreferredFramesPerSecond()),
+			bufferFormat.r + bufferFormat.g + bufferFormat.b + bufferFormat.a);
 	}
 
-	private class IOSDisplayMode extends DisplayMode {
-		protected IOSDisplayMode (int width, int height, int refreshRate, int bitsPerPixel) {
-			super(width, height, refreshRate, bitsPerPixel);
+	@Override
+	public Monitor getPrimaryMonitor () {
+		return new IOSMonitor(0, 0, "Primary Monitor");
+	}
+
+	@Override
+	public Monitor getMonitor () {
+		return getPrimaryMonitor();
+	}
+
+	@Override
+	public Monitor[] getMonitors () {
+		return new Monitor[] {getPrimaryMonitor()};
+	}
+
+	@Override
+	public DisplayMode[] getDisplayModes (Monitor monitor) {
+		return getDisplayModes();
+	}
+
+	@Override
+	public DisplayMode getDisplayMode (Monitor monitor) {
+		return getDisplayMode();
+	}
+
+	protected void updateSafeInsets () {
+		safeInsetTop = 0;
+		safeInsetLeft = 0;
+		safeInsetRight = 0;
+		safeInsetBottom = 0;
+
+		UIEdgeInsets edgeInsets = viewController.getView().getSafeAreaInsets();
+		safeInsetTop = (int)edgeInsets.getTop();
+		safeInsetLeft = (int)edgeInsets.getLeft();
+		safeInsetRight = (int)edgeInsets.getRight();
+		safeInsetBottom = (int)edgeInsets.getBottom();
+		if (config.hdpiMode == HdpiMode.Pixels) {
+			safeInsetTop *= app.pixelsPerPoint;
+			safeInsetLeft *= app.pixelsPerPoint;
+			safeInsetRight *= app.pixelsPerPoint;
+			safeInsetBottom *= app.pixelsPerPoint;
 		}
 	}
 
 	@Override
-	public boolean setDisplayMode (DisplayMode displayMode) {
+	public int getSafeInsetLeft () {
+		return safeInsetLeft;
+	}
+
+	@Override
+	public int getSafeInsetTop () {
+		return safeInsetTop;
+	}
+
+	@Override
+	public int getSafeInsetBottom () {
+		return safeInsetBottom;
+	}
+
+	@Override
+	public int getSafeInsetRight () {
+		return safeInsetRight;
+	}
+
+	@Override
+	public boolean setFullscreenMode (DisplayMode displayMode) {
 		return false;
 	}
 
 	@Override
-	public boolean setDisplayMode (int width, int height, boolean fullscreen) {
+	public boolean setWindowedMode (int width, int height) {
 		return false;
 	}
 
@@ -447,7 +533,24 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 	}
 
 	@Override
+	public void setUndecorated (boolean undecorated) {
+	}
+
+	@Override
+	public void setResizable (boolean resizable) {
+	}
+
+	@Override
 	public void setVSync (boolean vsync) {
+	}
+
+	/** Overwrites the preferred framerate for the application. Use {@link IOSApplicationConfiguration#preferredFramesPerSecond}
+	 * instead to set it at application startup.
+	 *
+	 * @param fps the preferred fps */
+	@Override
+	public void setForegroundFPS (int fps) {
+		viewController.setPreferredFramesPerSecond(fps);
 	}
 
 	@Override
@@ -457,28 +560,81 @@ public class IOSGraphics extends NSObject implements Graphics, GLKViewDelegate, 
 
 	@Override
 	public boolean supportsExtension (String extension) {
-		if (extensions == null) extensions = Gdx.gl.glGetString(GL10.GL_EXTENSIONS);
+		if (extensions == null) extensions = Gdx.gl.glGetString(GL20.GL_EXTENSIONS);
 		return extensions.contains(extension);
 	}
 
 	@Override
 	public void setContinuousRendering (boolean isContinuous) {
-		// FIXME implement this if possible
+		if (isContinuous != this.isContinuous) {
+			this.isContinuous = isContinuous;
+			// start the GLKViewController if we go from non-continuous -> continuous
+			if (isContinuous) viewController.setPaused(false);
+		}
 	}
 
 	@Override
 	public boolean isContinuousRendering () {
-		// FIXME implement this if possible
-		return true;
+		return isContinuous;
 	}
 
 	@Override
 	public void requestRendering () {
-		// FIXME implement this if possible
+		isFrameRequested = true;
+		// start the GLKViewController if we are in non-continuous mode
+		// (we should already be started in continuous mode)
+		if (!isContinuous) viewController.setPaused(false);
 	}
 
 	@Override
 	public boolean isFullscreen () {
 		return true;
+	}
+
+	@Override
+	public long getFrameId () {
+		return frameId;
+	}
+
+	@Override
+	public Cursor newCursor (Pixmap pixmap, int xHotspot, int yHotspot) {
+		return null;
+	}
+
+	@Override
+	public void setCursor (Cursor cursor) {
+	}
+
+	@Override
+	public void setSystemCursor (SystemCursor systemCursor) {
+	}
+
+	private class IOSViewDelegate extends NSObject implements GLKViewDelegate, GLKViewControllerDelegate {
+		@Override
+		public void update (GLKViewController controller) {
+			IOSGraphics.this.update(controller);
+		}
+
+		@Override
+		public void willPause (GLKViewController controller, boolean pause) {
+			IOSGraphics.this.willPause(controller, pause);
+		}
+
+		@Override
+		public void draw (GLKView view, CGRect rect) {
+			IOSGraphics.this.draw(view, rect);
+		}
+	}
+
+	private class IOSDisplayMode extends DisplayMode {
+		protected IOSDisplayMode (int width, int height, int refreshRate, int bitsPerPixel) {
+			super(width, height, refreshRate, bitsPerPixel);
+		}
+	}
+
+	private class IOSMonitor extends Monitor {
+		protected IOSMonitor (int virtualX, int virtualY, String name) {
+			super(virtualX, virtualY, name);
+		}
 	}
 }

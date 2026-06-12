@@ -18,12 +18,12 @@ package com.badlogic.gdx.scenes.scene2d.utils;
 
 import com.badlogic.gdx.graphics.g2d.Batch;
 
-/** A drawable knows how to draw itself at a given rectangular size. It provides border sizes and a minimum size so that other code
- * can determine how to size and position content.
+/** A drawable knows how to draw itself at a given rectangular size. It provides padding sizes and a minimum size so that other
+ * code can determine how to size and position content.
  * @author Nathan Sweet */
 public interface Drawable {
-	/** Draws this drawable at the specified bounds. The drawable should be tinted with {@link Batch#getColor()}, possibly by mixing
-	 * its own color. */
+	/** Draws this drawable at the specified bounds. The drawable should be tinted with {@link Batch#getColor()}, possibly by
+	 * mixing its own color. */
 	public void draw (Batch batch, float x, float y, float width, float height);
 
 	public float getLeftWidth ();
@@ -42,6 +42,21 @@ public interface Drawable {
 
 	public void setBottomHeight (float bottomHeight);
 
+	default public void setPadding (float topHeight, float leftWidth, float bottomHeight, float rightWidth) {
+		setTopHeight(topHeight);
+		setLeftWidth(leftWidth);
+		setBottomHeight(bottomHeight);
+		setRightWidth(rightWidth);
+	}
+
+	default public void setPadding (float padding) {
+		setPadding(padding, padding, padding, padding);
+	}
+
+	default public void setPadding (Drawable from) {
+		setPadding(from.getTopHeight(), from.getLeftWidth(), from.getBottomHeight(), from.getRightWidth());
+	}
+
 	public float getMinWidth ();
 
 	public void setMinWidth (float minWidth);
@@ -49,4 +64,9 @@ public interface Drawable {
 	public float getMinHeight ();
 
 	public void setMinHeight (float minHeight);
+
+	default public void setMinSize (float minWidth, float minHeight) {
+		setMinWidth(minWidth);
+		setMinHeight(minHeight);
+	}
 }

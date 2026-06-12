@@ -26,7 +26,6 @@ import java.util.Arrays;
 import com.badlogic.gdx.Application.ApplicationType;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.files.FileHandle;
-import com.badlogic.gdx.graphics.GL10;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -42,7 +41,7 @@ public class FilesTest extends GdxTest {
 
 	@Override
 	public void create () {
-		font = new BitmapFont(Gdx.files.internal("data/arial-15.fnt"), false);
+		font = new BitmapFont(Gdx.files.internal("data/lsans-15.fnt"), false);
 		batch = new SpriteBatch();
 
 		if (Gdx.files.isExternalStorageAvailable()) {
@@ -152,9 +151,11 @@ public class FilesTest extends GdxTest {
 		try {
 			testClasspath();
 			testInternal();
-			testExternal();
-			testAbsolute();
-			testLocal();
+			if (!(Gdx.app.getType() == ApplicationType.WebGL)) {
+				testExternal();
+				testAbsolute();
+				testLocal();
+			}
 		} catch (IOException ex) {
 			throw new RuntimeException(ex);
 		}
@@ -163,7 +164,7 @@ public class FilesTest extends GdxTest {
 	private void testClasspath () throws IOException {
 		// no classpath support on ios
 		if (Gdx.app.getType() == ApplicationType.iOS) return;
-		FileHandle handle = Gdx.files.classpath("com/badlogic/gdx/utils/arial-15.png");
+		FileHandle handle = Gdx.files.classpath("com/badlogic/gdx/utils/lsans-15.png");
 		if (!handle.exists()) fail();
 		if (handle.isDirectory()) fail();
 		try {
@@ -183,9 +184,9 @@ public class FilesTest extends GdxTest {
 		}
 		FileHandle dir = Gdx.files.classpath("com/badlogic/gdx/utils");
 		if (dir.isDirectory()) fail();
-		FileHandle child = dir.child("arial-15.fnt");
-		if (!child.name().equals("arial-15.fnt")) fail();
-		if (!child.nameWithoutExtension().equals("arial-15")) fail();
+		FileHandle child = dir.child("lsans-15.fnt");
+		if (!child.name().equals("lsans-15.fnt")) fail();
+		if (!child.nameWithoutExtension().equals("lsans-15")) fail();
 		if (!child.extension().equals("fnt")) fail();
 		handle.read().close();
 		if (handle.readBytes().length != handle.length()) fail();
@@ -209,16 +210,13 @@ public class FilesTest extends GdxTest {
 			fail();
 		} catch (Exception ignored) {
 		}
-		FileHandle dir;
-		if (Gdx.app.getType() == ApplicationType.Android || Gdx.app.getType() == ApplicationType.iOS)
-			dir = Gdx.files.internal("data");
-		else
-			dir = Gdx.files.internal("../gdx-tests-android/assets/data");
+		FileHandle dir = Gdx.files.internal("data");
 		if (Gdx.app.getType() != ApplicationType.Android) {
 			if (!dir.exists()) fail();
 		}
 		if (!dir.isDirectory()) fail();
 		if (dir.list().length == 0) fail();
+		Gdx.app.log("FilesTest", "Files in data: " + Arrays.toString(dir.list()) + " (" + dir.list().length + ")");
 		FileHandle child = dir.child("badlogic.jpg");
 		if (!child.name().equals("badlogic.jpg")) fail();
 		if (!child.nameWithoutExtension().equals("badlogic")) fail();
@@ -226,14 +224,16 @@ public class FilesTest extends GdxTest {
 		if (Gdx.app.getType() != ApplicationType.Android) {
 			if (!child.parent().exists()) fail();
 		}
-		FileHandle copy = Gdx.files.external("badlogic.jpg-copy");
-		copy.delete();
-		if (copy.exists()) fail();
-		handle.copyTo(copy);
-		if (!copy.exists()) fail();
-		if (copy.length() != 68465) fail();
-		copy.delete();
-		if (copy.exists()) fail();
+		if (!(Gdx.app.getType() == ApplicationType.WebGL)) {
+			FileHandle copy = Gdx.files.external("badlogic.jpg-copy");
+			copy.delete();
+			if (copy.exists()) fail();
+			handle.copyTo(copy);
+			if (!copy.exists()) fail();
+			if (copy.length() != 68465) fail();
+			copy.delete();
+			if (copy.exists()) fail();
+		}
 		handle.read().close();
 		if (handle.readBytes().length != handle.length()) fail();
 	}
@@ -387,7 +387,7 @@ public class FilesTest extends GdxTest {
 		if (handle.delete()) fail();
 		if (handle.list().length != 0) fail();
 		if (handle.child("meow").exists()) fail();
-		if (handle.parent().exists()) fail();
+		if (!handle.parent().exists()) fail();
 		try {
 			handle.read().close();
 			fail();
@@ -458,9 +458,9 @@ public class FilesTest extends GdxTest {
 
 	@Override
 	public void render () {
-		Gdx.gl.glClear(GL10.GL_COLOR_BUFFER_BIT);
+		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 		batch.begin();
-		font.drawMultiLine(batch, message, 20, Gdx.graphics.getHeight() - 20);
+		font.draw(batch, message, 20, Gdx.graphics.getHeight() - 20);
 		batch.end();
 	}
 
@@ -469,10 +469,4 @@ public class FilesTest extends GdxTest {
 		batch.dispose();
 		font.dispose();
 	}
-
-	@Override
-	public boolean needsGL20 () {
-		return true;
-	}
-
 }

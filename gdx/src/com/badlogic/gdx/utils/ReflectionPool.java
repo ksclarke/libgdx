@@ -22,7 +22,12 @@ import com.badlogic.gdx.utils.reflect.ReflectionException;
 
 /** Pool that creates new instances of a type using reflection. The type must have a zero argument constructor.
  * {@link Constructor#setAccessible(boolean)} will be used if the class and/or constructor is not visible.
+ * <p>
+ *
+ * @deprecated Please use {@link DefaultPool} instead.
+ *
  * @author Nathan Sweet */
+@Deprecated
 public class ReflectionPool<T> extends Pool<T> {
 	private final Constructor constructor;
 
@@ -41,7 +46,7 @@ public class ReflectionPool<T> extends Pool<T> {
 			throw new RuntimeException("Class cannot be created (missing no-arg constructor): " + type.getName());
 	}
 
-	private Constructor findConstructor (Class<T> type) {
+	private @Null Constructor findConstructor (Class<T> type) {
 		try {
 			return ClassReflection.getConstructor(type, (Class[])null);
 		} catch (Exception ex1) {

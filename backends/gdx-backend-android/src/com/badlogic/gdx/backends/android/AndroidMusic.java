@@ -42,52 +42,62 @@ public class AndroidMusic implements Music, MediaPlayer.OnCompletionListener {
 	public void dispose () {
 		if (player == null) return;
 		try {
-			if (player.isPlaying()) player.stop();
 			player.release();
 		} catch (Throwable t) {
-			Gdx.app.log("AndroidMusic", "error while disposing AndroidMusic instance, non-fatal");
+			Gdx.app.log("AndroidMusic", "Error while disposing AndroidMusic instance, non-fatal");
 		} finally {
 			player = null;
 			onCompletionListener = null;
-			synchronized (audio.musics) {
-				audio.musics.remove(this);
-			}
+			audio.notifyMusicDisposed(this);
 		}
 	}
 
 	@Override
 	public boolean isLooping () {
 		if (player == null) return false;
-		return player.isLooping();
+		try {
+			return player.isLooping();
+		} catch (IllegalStateException e) {
+			Gdx.app.error("AndroidMusic", "Error while checking isLooping", e);
+			return false;
+		}
 	}
 
 	@Override
 	public boolean isPlaying () {
 		if (player == null) return false;
-		return player.isPlaying();
+		try {
+			return player.isPlaying();
+		} catch (IllegalStateException e) {
+			Gdx.app.error("AndroidMusic", "Error while checking isPlaying", e);
+			return false;
+		}
 	}
 
 	@Override
 	public void pause () {
 		if (player == null) return;
-		if (player.isPlaying()) player.pause();
+		try {
+			if (player.isPlaying()) {
+				player.pause();
+			}
+		} catch (IllegalStateException e) {
+			Gdx.app.error("AndroidMusic", "Error trying to pause music", e);
+		}
+		wasPlaying = false;
 	}
 
 	@Override
 	public void play () {
 		if (player == null) return;
-		if (player.isPlaying()) return;
-
 		try {
 			if (!isPrepared) {
 				player.prepare();
 				isPrepared = true;
 			}
 			player.start();
-		} catch (IllegalStateException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
+		} catch (IllegalStateException | IOException e) {
+			Gdx.app.error("AndroidMusic", "Error trying to play music", e);
 		}
 	}
 
@@ -128,9 +138,6 @@ public class AndroidMusic implements Music, MediaPlayer.OnCompletionListener {
 	@Override
 	public void stop () {
 		if (player == null) return;
-		if (isPrepared) {
-			player.seekTo(0);
-		}
 		player.stop();
 		isPrepared = false;
 	}
@@ -143,10 +150,8 @@ public class AndroidMusic implements Music, MediaPlayer.OnCompletionListener {
 				isPrepared = true;
 			}
 			player.seekTo((int)(position * 1000));
-		} catch (IllegalStateException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
+		} catch (IllegalStateException | IOException e) {
+			Gdx.app.error("AndroidMusic", "Error setting music position", e);
 		}
 	}
 
@@ -172,7 +177,9 @@ public class AndroidMusic implements Music, MediaPlayer.OnCompletionListener {
 			Gdx.app.postRunnable(new Runnable() {
 				@Override
 				public void run () {
-					onCompletionListener.onCompletion(AndroidMusic.this);
+					if (onCompletionListener != null) {
+						onCompletionListener.onCompletion(AndroidMusic.this);
+					}
 				}
 			});
 		}

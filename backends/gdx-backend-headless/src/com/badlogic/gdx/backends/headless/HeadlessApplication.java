@@ -18,6 +18,7 @@ package com.badlogic.gdx.backends.headless;
 
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.ApplicationListener;
+import com.badlogic.gdx.ApplicationLogger;
 import com.badlogic.gdx.Audio;
 import com.badlogic.gdx.Files;
 import com.badlogic.gdx.Gdx;
@@ -36,7 +37,7 @@ import com.badlogic.gdx.utils.ObjectMap;
 import com.badlogic.gdx.utils.TimeUtils;
 
 /** a headless implementation of a GDX Application primarily intended to be used in servers
- *  @author Jon Renner */
+ * @author Jon Renner */
 public class HeadlessApplication implements Application {
 	protected final ApplicationListener listener;
 	protected Thread mainLoopThread;
@@ -50,34 +51,37 @@ public class HeadlessApplication implements Application {
 	protected final Array<Runnable> executedRunnables = new Array<Runnable>();
 	protected final Array<LifecycleListener> lifecycleListeners = new Array<LifecycleListener>();
 	protected int logLevel = LOG_INFO;
-	private final long renderInterval;
+	protected ApplicationLogger applicationLogger;
+	private String preferencesdir;
 
-	public HeadlessApplication(ApplicationListener listener) {
+	public HeadlessApplication (ApplicationListener listener) {
 		this(listener, null);
 	}
-	
-	public HeadlessApplication(ApplicationListener listener, HeadlessApplicationConfiguration config) {
-		if (config == null)
-			config = new HeadlessApplicationConfiguration();
-		
+
+	public HeadlessApplication (ApplicationListener listener, HeadlessApplicationConfiguration config) {
+		if (config == null) config = new HeadlessApplicationConfiguration();
+
 		HeadlessNativesLoader.load();
+		setApplicationLogger(new HeadlessApplicationLogger());
 		this.listener = listener;
 		this.files = new HeadlessFiles();
-		this.net = new HeadlessNet();
+		this.net = new HeadlessNet(config);
 		// the following elements are not applicable for headless applications
 		// they are only implemented as mock objects
 		this.graphics = new MockGraphics();
+		this.graphics.setForegroundFPS(config.updatesPerSecond);
 		this.audio = new MockAudio();
 		this.input = new MockInput();
+
+		this.preferencesdir = config.preferencesDirectory;
 
 		Gdx.app = this;
 		Gdx.files = files;
 		Gdx.net = net;
 		Gdx.audio = audio;
 		Gdx.graphics = graphics;
-		
-		renderInterval = config.renderInterval > 0 ? (long)(config.renderInterval * 1000000000f) : (config.renderInterval < 0 ? -1 : 0);
-		
+		Gdx.input = input;
+
 		initialize();
 	}
 
@@ -98,31 +102,32 @@ public class HeadlessApplication implements Application {
 		mainLoopThread.start();
 	}
 
-	void mainLoop () {
+	protected void mainLoop () {
 		Array<LifecycleListener> lifecycleListeners = this.lifecycleListeners;
 
 		listener.create();
 
-		boolean wasActive = true;
-
 		// unlike LwjglApplication, a headless application will eat up CPU in this while loop
 		// it is up to the implementation to call Thread.sleep as necessary
-		long t = TimeUtils.nanoTime() + renderInterval;
-		if (renderInterval >= 0f) {
+		long t = TimeUtils.nanoTime() + graphics.getTargetRenderInterval();
+		if (graphics.getTargetRenderInterval() >= 0f) {
 			while (running) {
 				final long n = TimeUtils.nanoTime();
 				if (t > n) {
 					try {
-						Thread.sleep((t - n) / 1000000);
-					} catch (InterruptedException e) {}
-					t = TimeUtils.nanoTime() + renderInterval;
+						long sleep = t - n;
+						Thread.sleep(sleep / 1000000, (int)(sleep % 1000000));
+					} catch (InterruptedException e) {
+					}
+					t = t + graphics.getTargetRenderInterval();
 				} else
-					t = n + renderInterval;
-				
+					t = n + graphics.getTargetRenderInterval();
+
 				executeRunnables();
+				graphics.incrementFrameId();
 				listener.render();
 				graphics.updateTime();
-	
+
 				// If one of the runnables set running to false, for example after an exit().
 				if (!running) break;
 			}
@@ -140,56 +145,53 @@ public class HeadlessApplication implements Application {
 
 	public boolean executeRunnables () {
 		synchronized (runnables) {
-			executedRunnables.addAll(runnables);
+			for (int i = runnables.size - 1; i >= 0; i--)
+				executedRunnables.add(runnables.get(i));
 			runnables.clear();
 		}
 		if (executedRunnables.size == 0) return false;
-		for (int i = 0; i < executedRunnables.size; i++)
-			executedRunnables.get(i).run();
-		executedRunnables.clear();
+		for (int i = executedRunnables.size - 1; i >= 0; i--)
+			executedRunnables.removeIndex(i).run();
 		return true;
 	}
 
 	@Override
-	public ApplicationListener getApplicationListener() {
+	public ApplicationListener getApplicationListener () {
 		return listener;
 	}
 
 	@Override
-	public Graphics getGraphics() {
-		// no graphics
-		return null;
+	public Graphics getGraphics () {
+		return graphics;
 	}
 
 	@Override
-	public Audio getAudio() {
-		// no audio
-		return null;
+	public Audio getAudio () {
+		return audio;
 	}
 
 	@Override
-	public Input getInput() {
-		// no input
-		return null;
+	public Input getInput () {
+		return input;
 	}
 
 	@Override
-	public Files getFiles() {
+	public Files getFiles () {
 		return files;
 	}
 
 	@Override
-	public Net getNet() {
+	public Net getNet () {
 		return net;
 	}
 
 	@Override
-	public ApplicationType getType() {
+	public ApplicationType getType () {
 		return ApplicationType.HeadlessDesktop;
 	}
 
 	@Override
-	public int getVersion() {
+	public int getVersion () {
 		return 0;
 	}
 
@@ -206,11 +208,11 @@ public class HeadlessApplication implements Application {
 	ObjectMap<String, Preferences> preferences = new ObjectMap<String, Preferences>();
 
 	@Override
-	public Preferences getPreferences(String name) {
+	public Preferences getPreferences (String name) {
 		if (preferences.containsKey(name)) {
 			return preferences.get(name);
 		} else {
-			Preferences prefs = new HeadlessPreferences(name, ".prefs/");
+			Preferences prefs = new HeadlessPreferences(name, this.preferencesdir);
 			preferences.put(name, prefs);
 			return prefs;
 		}
@@ -231,47 +233,32 @@ public class HeadlessApplication implements Application {
 
 	@Override
 	public void debug (String tag, String message) {
-		if (logLevel >= LOG_DEBUG) {
-			System.out.println(tag + ": " + message);
-		}
+		if (logLevel >= LOG_DEBUG) getApplicationLogger().debug(tag, message);
 	}
 
 	@Override
 	public void debug (String tag, String message, Throwable exception) {
-		if (logLevel >= LOG_DEBUG) {
-			System.out.println(tag + ": " + message);
-			exception.printStackTrace(System.out);
-		}
+		if (logLevel >= LOG_DEBUG) getApplicationLogger().debug(tag, message, exception);
 	}
 
 	@Override
 	public void log (String tag, String message) {
-		if (logLevel >= LOG_INFO) {
-			System.out.println(tag + ": " + message);
-		}
+		if (logLevel >= LOG_INFO) getApplicationLogger().log(tag, message);
 	}
 
 	@Override
 	public void log (String tag, String message, Throwable exception) {
-		if (logLevel >= LOG_INFO) {
-			System.out.println(tag + ": " + message);
-			exception.printStackTrace(System.out);
-		}
+		if (logLevel >= LOG_INFO) getApplicationLogger().log(tag, message, exception);
 	}
 
 	@Override
 	public void error (String tag, String message) {
-		if (logLevel >= LOG_ERROR) {
-			System.err.println(tag + ": " + message);
-		}
+		if (logLevel >= LOG_ERROR) getApplicationLogger().error(tag, message);
 	}
 
 	@Override
 	public void error (String tag, String message, Throwable exception) {
-		if (logLevel >= LOG_ERROR) {
-			System.err.println(tag + ": " + message);
-			exception.printStackTrace(System.err);
-		}
+		if (logLevel >= LOG_ERROR) getApplicationLogger().error(tag, message, exception);
 	}
 
 	@Override
@@ -280,8 +267,18 @@ public class HeadlessApplication implements Application {
 	}
 
 	@Override
-	public int getLogLevel() {
+	public int getLogLevel () {
 		return logLevel;
+	}
+
+	@Override
+	public void setApplicationLogger (ApplicationLogger applicationLogger) {
+		this.applicationLogger = applicationLogger;
+	}
+
+	@Override
+	public ApplicationLogger getApplicationLogger () {
+		return applicationLogger;
 	}
 
 	@Override

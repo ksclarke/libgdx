@@ -18,11 +18,10 @@ package com.badlogic.gdx.tests;
 
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.InputProcessor;
-import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.GL10;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g3d.utils.CameraInputController;
 import com.badlogic.gdx.input.GestureDetector;
@@ -30,39 +29,19 @@ import com.badlogic.gdx.input.GestureDetector.GestureListener;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
-import com.badlogic.gdx.scenes.scene2d.utils.Align;
-import com.badlogic.gdx.tests.box2d.Box2DTest;
-import com.badlogic.gdx.tests.bullet.BasicBulletTest;
-import com.badlogic.gdx.tests.bullet.BasicShapesTest;
-import com.badlogic.gdx.tests.bullet.BulletTest;
-import com.badlogic.gdx.tests.bullet.CollisionTest;
-import com.badlogic.gdx.tests.bullet.CollisionWorldTest;
-import com.badlogic.gdx.tests.bullet.ConstraintsTest;
-import com.badlogic.gdx.tests.bullet.ContactCacheTest;
-import com.badlogic.gdx.tests.bullet.ContactCallbackTest;
-import com.badlogic.gdx.tests.bullet.ContactCallbackTest2;
-import com.badlogic.gdx.tests.bullet.ConvexHullDistanceTest;
-import com.badlogic.gdx.tests.bullet.ConvexHullTest;
-import com.badlogic.gdx.tests.bullet.FrustumCullingTest;
-import com.badlogic.gdx.tests.bullet.ImportTest;
-import com.badlogic.gdx.tests.bullet.InternalTickTest;
-import com.badlogic.gdx.tests.bullet.KinematicTest;
-import com.badlogic.gdx.tests.bullet.MeshShapeTest;
-import com.badlogic.gdx.tests.bullet.RayPickRagdollTest;
-import com.badlogic.gdx.tests.bullet.RayCastTest;
-import com.badlogic.gdx.tests.bullet.ShootTest;
-import com.badlogic.gdx.tests.bullet.SoftBodyTest;
-import com.badlogic.gdx.tests.bullet.SoftMeshTest;
-import com.badlogic.gdx.tests.bullet.VehicleTest;
+import com.badlogic.gdx.tests.bullet.*;
 import com.badlogic.gdx.tests.utils.GdxTest;
+import com.badlogic.gdx.utils.Align;
 
 /** @author xoppa */
 public class BulletTestCollection extends GdxTest implements InputProcessor, GestureListener {
 	protected final BulletTest[] tests = {new BasicBulletTest(), new ShootTest(), new BasicShapesTest(), new KinematicTest(),
-		new ConstraintsTest(), new MeshShapeTest(), new ConvexHullTest(), new ConvexHullDistanceTest(), new RayCastTest(), new RayPickRagdollTest(),
-		new InternalTickTest(), new CollisionWorldTest(), new CollisionTest(), new FrustumCullingTest(), new ContactCallbackTest(),
-		new ContactCallbackTest2(), new ContactCacheTest(), new SoftBodyTest(), new SoftMeshTest(), new VehicleTest(),
-		new ImportTest()};
+		new ConstraintsTest(), new MeshShapeTest(), new GimpactTest(), new ConvexHullTest(), new ConvexHullDistanceTest(),
+		new RayCastTest(), new RayPickRagdollTest(), new InternalTickTest(), new CollisionWorldTest(), new CollisionTest(),
+		new FrustumCullingTest(), new CollisionDispatcherTest(), new ContactCallbackTest(), new ContactCallbackTest2(),
+		new ContactCacheTest(), new SoftBodyTest(), new SoftMeshTest(), new VehicleTest(), new VehicleFilterTest(),
+		new CharacterTest(), new ImportTest(), new TriangleRaycastTest(), new OcclusionCullingTest(), new PairCacheTest(),
+		new HeightFieldTest()};
 
 	protected int testIndex = 0;
 
@@ -99,8 +78,8 @@ public class BulletTestCollection extends GdxTest implements InputProcessor, Ges
 		cameraController.translateTarget = false;
 		Gdx.input.setInputProcessor(new InputMultiplexer(cameraController, this, new GestureDetector(this)));
 
-		font = new BitmapFont(Gdx.files.internal("data/arial-15.fnt"), false);
-		hud = new Stage(480, 320, true);
+		font = new BitmapFont(Gdx.files.internal("data/lsans-15.fnt"), false);
+		hud = new Stage();
 		hud.addActor(fpsLabel = new Label(" ", new Label.LabelStyle(font, Color.WHITE)));
 		fpsLabel.setPosition(0, 0);
 		hud.addActor(titleLabel = new Label(tests[testIndex].getClass().getSimpleName(), new Label.LabelStyle(font, Color.WHITE)));
@@ -109,6 +88,11 @@ public class BulletTestCollection extends GdxTest implements InputProcessor, Ges
 		instructLabel.setY(titleLabel.getY() - instructLabel.getHeight());
 		instructLabel.setAlignment(Align.top | Align.left);
 		instructLabel.setText(tests[testIndex].instructions);
+	}
+
+	@Override
+	public void resize (int width, int height) {
+		hud.getViewport().update(width, height, true);
 	}
 
 	@Override
@@ -174,18 +158,13 @@ public class BulletTestCollection extends GdxTest implements InputProcessor, Ges
 	}
 
 	@Override
-	public boolean needsGL20 () {
-		return true;
-	}
-
-	@Override
 	public boolean mouseMoved (int x, int y) {
 		return tests[testIndex].mouseMoved(x, y);
 	}
 
 	@Override
-	public boolean scrolled (int amount) {
-		return tests[testIndex].scrolled(amount);
+	public boolean scrolled (float amountX, float amountY) {
+		return tests[testIndex].scrolled(amountX, amountY);
 	}
 
 	@Override
@@ -227,5 +206,9 @@ public class BulletTestCollection extends GdxTest implements InputProcessor, Ges
 	@Override
 	public boolean pinch (Vector2 initialFirstPointer, Vector2 initialSecondPointer, Vector2 firstPointer, Vector2 secondPointer) {
 		return tests[testIndex].pinch(initialFirstPointer, initialSecondPointer, firstPointer, secondPointer);
+	}
+
+	@Override
+	public void pinchStop () {
 	}
 }

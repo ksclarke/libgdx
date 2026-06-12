@@ -22,15 +22,59 @@ import com.badlogic.gdx.scenes.scene2d.Action;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.EventListener;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
+import com.badlogic.gdx.utils.DefaultPool.PoolSupplier;
+import com.badlogic.gdx.utils.GdxRuntimeException;
+import com.badlogic.gdx.utils.Null;
 import com.badlogic.gdx.utils.Pool;
-import com.badlogic.gdx.utils.Pools;
+import com.badlogic.gdx.utils.PoolManager;
 
 /** Static convenience methods for using pooled actions, intended for static import.
  * @author Nathan Sweet */
 public class Actions {
+
+	public static final PoolManager ACTION_POOLS = new PoolManager();
+
+	static {
+		registerAction(AddAction.class, AddAction::new);
+		registerAction(AddListenerAction.class, AddListenerAction::new);
+		registerAction(AfterAction.class, AfterAction::new);
+		registerAction(AlphaAction.class, AlphaAction::new);
+		registerAction(ColorAction.class, ColorAction::new);
+		registerAction(DelayAction.class, DelayAction::new);
+		registerAction(FloatAction.class, FloatAction::new);
+		registerAction(IntAction.class, IntAction::new);
+		registerAction(LayoutAction.class, LayoutAction::new);
+		registerAction(MoveByAction.class, MoveByAction::new);
+		registerAction(MoveToAction.class, MoveToAction::new);
+		registerAction(ParallelAction.class, ParallelAction::new);
+		registerAction(RemoveAction.class, RemoveAction::new);
+		registerAction(RemoveActorAction.class, RemoveActorAction::new);
+		registerAction(RemoveListenerAction.class, RemoveListenerAction::new);
+		registerAction(RepeatAction.class, RepeatAction::new);
+		registerAction(RotateByAction.class, RotateByAction::new);
+		registerAction(RotateToAction.class, RotateToAction::new);
+		registerAction(RunnableAction.class, RunnableAction::new);
+		registerAction(ScaleByAction.class, ScaleByAction::new);
+		registerAction(ScaleToAction.class, ScaleToAction::new);
+		registerAction(SequenceAction.class, SequenceAction::new);
+		registerAction(SizeByAction.class, SizeByAction::new);
+		registerAction(SizeToAction.class, SizeToAction::new);
+		registerAction(TimeScaleAction.class, TimeScaleAction::new);
+		registerAction(TouchableAction.class, TouchableAction::new);
+		registerAction(VisibleAction.class, VisibleAction::new);
+	}
+
+	static public <T extends Action> void registerAction (Class<T> poolClass, PoolSupplier<T> supplier) {
+		ACTION_POOLS.addPool(poolClass, supplier);
+	}
+
 	/** Returns a new or pooled action of the specified type. */
 	static public <T extends Action> T action (Class<T> type) {
-		Pool<T> pool = Pools.get(type);
+		Pool<T> pool = ACTION_POOLS.getPoolOrNull(type);
+		if (pool == null) {
+			throw new GdxRuntimeException(
+				"No action pool registered for type " + type + ". Register it with Actions#registerAction.");
+		}
 		T action = pool.obtain();
 		action.setPool(pool);
 		return action;
@@ -44,7 +88,7 @@ public class Actions {
 
 	static public AddAction addAction (Action action, Actor targetActor) {
 		AddAction addAction = action(AddAction.class);
-		addAction.setTargetActor(targetActor);
+		addAction.setTarget(targetActor);
 		addAction.setAction(action);
 		return addAction;
 	}
@@ -57,7 +101,7 @@ public class Actions {
 
 	static public RemoveAction removeAction (Action action, Actor targetActor) {
 		RemoveAction removeAction = action(RemoveAction.class);
-		removeAction.setTargetActor(targetActor);
+		removeAction.setTarget(targetActor);
 		removeAction.setAction(action);
 		return removeAction;
 	}
@@ -71,9 +115,25 @@ public class Actions {
 		return moveTo(x, y, duration, null);
 	}
 
-	static public MoveToAction moveTo (float x, float y, float duration, Interpolation interpolation) {
+	static public MoveToAction moveTo (float x, float y, float duration, @Null Interpolation interpolation) {
 		MoveToAction action = action(MoveToAction.class);
 		action.setPosition(x, y);
+		action.setDuration(duration);
+		action.setInterpolation(interpolation);
+		return action;
+	}
+
+	static public MoveToAction moveToAligned (float x, float y, int alignment) {
+		return moveToAligned(x, y, alignment, 0, null);
+	}
+
+	static public MoveToAction moveToAligned (float x, float y, int alignment, float duration) {
+		return moveToAligned(x, y, alignment, duration, null);
+	}
+
+	static public MoveToAction moveToAligned (float x, float y, int alignment, float duration, @Null Interpolation interpolation) {
+		MoveToAction action = action(MoveToAction.class);
+		action.setPosition(x, y, alignment);
 		action.setDuration(duration);
 		action.setInterpolation(interpolation);
 		return action;
@@ -88,7 +148,7 @@ public class Actions {
 		return moveBy(amountX, amountY, duration, null);
 	}
 
-	static public MoveByAction moveBy (float amountX, float amountY, float duration, Interpolation interpolation) {
+	static public MoveByAction moveBy (float amountX, float amountY, float duration, @Null Interpolation interpolation) {
 		MoveByAction action = action(MoveByAction.class);
 		action.setAmount(amountX, amountY);
 		action.setDuration(duration);
@@ -105,7 +165,7 @@ public class Actions {
 		return sizeTo(x, y, duration, null);
 	}
 
-	static public SizeToAction sizeTo (float x, float y, float duration, Interpolation interpolation) {
+	static public SizeToAction sizeTo (float x, float y, float duration, @Null Interpolation interpolation) {
 		SizeToAction action = action(SizeToAction.class);
 		action.setSize(x, y);
 		action.setDuration(duration);
@@ -122,7 +182,7 @@ public class Actions {
 		return sizeBy(amountX, amountY, duration, null);
 	}
 
-	static public SizeByAction sizeBy (float amountX, float amountY, float duration, Interpolation interpolation) {
+	static public SizeByAction sizeBy (float amountX, float amountY, float duration, @Null Interpolation interpolation) {
 		SizeByAction action = action(SizeByAction.class);
 		action.setAmount(amountX, amountY);
 		action.setDuration(duration);
@@ -139,7 +199,7 @@ public class Actions {
 		return scaleTo(x, y, duration, null);
 	}
 
-	static public ScaleToAction scaleTo (float x, float y, float duration, Interpolation interpolation) {
+	static public ScaleToAction scaleTo (float x, float y, float duration, @Null Interpolation interpolation) {
 		ScaleToAction action = action(ScaleToAction.class);
 		action.setScale(x, y);
 		action.setDuration(duration);
@@ -156,7 +216,7 @@ public class Actions {
 		return scaleBy(amountX, amountY, duration, null);
 	}
 
-	static public ScaleByAction scaleBy (float amountX, float amountY, float duration, Interpolation interpolation) {
+	static public ScaleByAction scaleBy (float amountX, float amountY, float duration, @Null Interpolation interpolation) {
 		ScaleByAction action = action(ScaleByAction.class);
 		action.setAmount(amountX, amountY);
 		action.setDuration(duration);
@@ -173,7 +233,7 @@ public class Actions {
 		return rotateTo(rotation, duration, null);
 	}
 
-	static public RotateToAction rotateTo (float rotation, float duration, Interpolation interpolation) {
+	static public RotateToAction rotateTo (float rotation, float duration, @Null Interpolation interpolation) {
 		RotateToAction action = action(RotateToAction.class);
 		action.setRotation(rotation);
 		action.setDuration(duration);
@@ -190,7 +250,7 @@ public class Actions {
 		return rotateBy(rotationAmount, duration, null);
 	}
 
-	static public RotateByAction rotateBy (float rotationAmount, float duration, Interpolation interpolation) {
+	static public RotateByAction rotateBy (float rotationAmount, float duration, @Null Interpolation interpolation) {
 		RotateByAction action = action(RotateByAction.class);
 		action.setAmount(rotationAmount);
 		action.setDuration(duration);
@@ -209,7 +269,7 @@ public class Actions {
 	}
 
 	/** Transitions from the color at the time this action starts to the specified color. */
-	static public ColorAction color (Color color, float duration, Interpolation interpolation) {
+	static public ColorAction color (Color color, float duration, @Null Interpolation interpolation) {
 		ColorAction action = action(ColorAction.class);
 		action.setEndColor(color);
 		action.setDuration(duration);
@@ -228,7 +288,7 @@ public class Actions {
 	}
 
 	/** Transitions from the alpha at the time this action starts to the specified alpha. */
-	static public AlphaAction alpha (float a, float duration, Interpolation interpolation) {
+	static public AlphaAction alpha (float a, float duration, @Null Interpolation interpolation) {
 		AlphaAction action = action(AlphaAction.class);
 		action.setAlpha(a);
 		action.setDuration(duration);
@@ -242,7 +302,7 @@ public class Actions {
 	}
 
 	/** Transitions from the alpha at the time this action starts to an alpha of 0. */
-	static public AlphaAction fadeOut (float duration, Interpolation interpolation) {
+	static public AlphaAction fadeOut (float duration, @Null Interpolation interpolation) {
 		AlphaAction action = action(AlphaAction.class);
 		action.setAlpha(0);
 		action.setDuration(duration);
@@ -256,7 +316,7 @@ public class Actions {
 	}
 
 	/** Transitions from the alpha at the time this action starts to an alpha of 1. */
-	static public AlphaAction fadeIn (float duration, Interpolation interpolation) {
+	static public AlphaAction fadeIn (float duration, @Null Interpolation interpolation) {
 		AlphaAction action = action(AlphaAction.class);
 		action.setAlpha(1);
 		action.setDuration(duration);
@@ -290,7 +350,7 @@ public class Actions {
 
 	static public RemoveActorAction removeActor (Actor removeActor) {
 		RemoveActorAction action = action(RemoveActorAction.class);
-		action.setRemoveActor(removeActor);
+		action.setTarget(removeActor);
 		return action;
 	}
 
@@ -457,7 +517,7 @@ public class Actions {
 
 	static public AddListenerAction addListener (EventListener listener, boolean capture, Actor targetActor) {
 		AddListenerAction addAction = action(AddListenerAction.class);
-		addAction.setTargetActor(targetActor);
+		addAction.setTarget(targetActor);
 		addAction.setListener(listener);
 		addAction.setCapture(capture);
 		return addAction;
@@ -472,9 +532,18 @@ public class Actions {
 
 	static public RemoveListenerAction removeListener (EventListener listener, boolean capture, Actor targetActor) {
 		RemoveListenerAction addAction = action(RemoveListenerAction.class);
-		addAction.setTargetActor(targetActor);
+		addAction.setTarget(targetActor);
 		addAction.setListener(listener);
 		addAction.setCapture(capture);
 		return addAction;
+	}
+
+	/** Sets the target of an action and returns the action.
+	 * @param target the desired target of the action
+	 * @param action the action on which to set the target
+	 * @return the action with its target set */
+	static public Action targeting (Actor target, Action action) {
+		action.setTarget(target);
+		return action;
 	}
 }

@@ -25,40 +25,39 @@ import java.util.concurrent.TimeUnit;
 import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 
-/**
- * Allows asnynchronous execution of {@link AsyncTask} instances on a separate thread.
- * Needs to be disposed via a call to {@link #dispose()} when no longer used, in which
- * case the executor waits for running tasks to finish. Scheduled but not yet
- * running tasks will not be executed. 
- * @author badlogic
- *
- */
+/** Allows asynchronous execution of {@link AsyncTask} instances on a separate thread. Needs to be disposed via a call to
+ * {@link #dispose()} when no longer used, in which case the executor waits for running tasks to finish. Scheduled but not yet
+ * running tasks will not be executed.
+ * @author badlogic */
 public class AsyncExecutor implements Disposable {
 	private final ExecutorService executor;
-	
-	/**
-	 * Creates a new AsynchExecutor that allows maxConcurrent
-	 * {@link Runnable} instances to run in parallel.
+
+	/** Creates a new AsyncExecutor with the name "AsyncExecutor-Thread". */
+	public AsyncExecutor (int maxConcurrent) {
+		this(maxConcurrent, "AsyncExecutor-Thread");
+	}
+
+	/** Creates a new AsynchExecutor that allows maxConcurrent {@link Runnable} instances to run in parallel.
 	 * @param maxConcurrent
-	 */
-	public AsyncExecutor(int maxConcurrent) {
+	 * @param name The name of the threads. */
+	public AsyncExecutor (int maxConcurrent, final String name) {
 		executor = Executors.newFixedThreadPool(maxConcurrent, new ThreadFactory() {
 			@Override
 			public Thread newThread (Runnable r) {
-				Thread thread = new Thread(r, "AsynchExecutor-Thread");
+				Thread thread = new Thread(r, name);
 				thread.setDaemon(true);
 				return thread;
 			}
 		});
 	}
-	
-	/**
-	 * Submits a {@link Runnable} to be executed asynchronously. If
-	 * maxConcurrent runnables are already running, the runnable 
-	 * will be queued.
-	 * @param task the task to execute asynchronously
-	 */
-	public <T> AsyncResult<T> submit(final AsyncTask<T> task) {
+
+	/** Submits a {@link Runnable} to be executed asynchronously. If maxConcurrent runnables are already running, the runnable will
+	 * be queued.
+	 * @param task the task to execute asynchronously */
+	public <T> AsyncResult<T> submit (final AsyncTask<T> task) {
+		if (executor.isShutdown()) {
+			throw new GdxRuntimeException("Cannot run tasks on an executor that has been shutdown (disposed)");
+		}
 		return new AsyncResult(executor.submit(new Callable<T>() {
 			@Override
 			public T call () throws Exception {
@@ -66,12 +65,9 @@ public class AsyncExecutor implements Disposable {
 			}
 		}));
 	}
-	
-	/**
-	 * Waits for running {@link AsyncTask} instances to finish,
-	 * then destroys any resources like threads. Can not be used
-	 * after this method is called.
-	 */
+
+	/** Waits for running {@link AsyncTask} instances to finish, then destroys any resources like threads. Can not be used after
+	 * this method is called. */
 	@Override
 	public void dispose () {
 		executor.shutdown();

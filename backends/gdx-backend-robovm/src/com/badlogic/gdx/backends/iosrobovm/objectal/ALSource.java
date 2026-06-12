@@ -16,16 +16,14 @@
 
 package com.badlogic.gdx.backends.iosrobovm.objectal;
 
-import org.robovm.cocoatouch.foundation.NSObject;
+import org.robovm.apple.foundation.NSObject;
 import org.robovm.objc.ObjCRuntime;
-import org.robovm.objc.Selector;
+import org.robovm.objc.annotation.Method;
 import org.robovm.objc.annotation.NativeClass;
-import org.robovm.rt.bro.annotation.Bridge;
+import org.robovm.objc.annotation.Property;
 import org.robovm.rt.bro.annotation.Library;
 
-/**
- * @author Niklas Therning
- */
+/** @author Niklas Therning */
 @Library(Library.INTERNAL)
 @NativeClass
 public class ALSource extends NSObject {
@@ -34,21 +32,45 @@ public class ALSource extends NSObject {
 		ObjCRuntime.bind(ALSource.class);
 	}
 
-    private static final Selector stop = Selector.register("stop");
-    @Bridge private native static void objc_stop(ALSource __self__, Selector __cmd__);
-    public void stop() {
-    	objc_stop(this, stop);
-    }
-	
-    private static final Selector paused = Selector.register("paused");
-    @Bridge private native static boolean objc_isPaused(ALSource __self__, Selector __cmd__);
-    public boolean isPaused() {
-        return objc_isPaused(this, paused);
-    }
-    
-    private static final Selector setPaused$ = Selector.register("setPaused:");
-    @Bridge private native static void objc_setPaused(ALSource __self__, Selector __cmd__, boolean paused);
-    public void setPaused(boolean paused) {
-    	objc_setPaused(this, setPaused$, paused);
-    }
+	@Property(selector = "sourceId")
+	public native int getSourceId ();
+
+	@Property(selector = "state")
+	public native int getState ();
+
+	@Method(selector = "stop")
+	public native void stop ();
+
+	@Property(selector = "paused")
+	public native boolean isPaused ();
+
+	@Property(selector = "setPaused:")
+	public native void setPaused (boolean paused);
+
+	@Method(selector = "setVolume:")
+	public native void setVolume (float volume);
+
+	@Method(selector = "setPitch:")
+	public native void setPitch (float pitch);
+
+	@Method(selector = "setPan:")
+	public native void setPan (float pan);
+
+	@Method(selector = "setLooping:")
+	public native void setLooping (boolean shouldLoop);
+
+	@Method(selector = "buffersProcessed")
+	public native int buffersProcessed ();
+
+	@Method(selector = "unqueueBuffer:")
+	public native boolean unqueueBuffer (ALBuffer buffer);
+
+	@Method(selector = "queueBuffer:")
+	public native boolean queueBuffer (ALBuffer buffer);
+
+	@Method(selector = "playing")
+	public native boolean playing ();
+
+	@Method(selector = "play")
+	public native int play ();
 }

@@ -26,7 +26,15 @@ public class DefaultAssetFilter implements AssetFilter {
 
 	@Override
 	public boolean accept (String file, boolean isDirectory) {
+		String normFile = file.replace('\\', '/');
+		if (normFile.contains("/.")) return false;
+		if (normFile.contains("/_")) return false;
 		if (isDirectory && file.endsWith(".svn")) return false;
+		return true;
+	}
+
+	@Override
+	public boolean preload (String file) {
 		return true;
 	}
 
@@ -40,7 +48,8 @@ public class DefaultAssetFilter implements AssetFilter {
 	}
 
 	private boolean isImage (String extension) {
-		return extension.equals("jpg") || extension.equals("png") || extension.equals("bmp") || extension.equals("gif");
+		return extension.equals("jpg") || extension.equals("jpeg") || extension.equals("png") || extension.equals("bmp")
+			|| extension.equals("gif");
 	}
 
 	private boolean isText (String extension) {

@@ -45,22 +45,23 @@ public class Timer {
 	}
 
 	/** Schedules a task to occur once as soon as possible, but not sooner than the start of the next frame. */
-	public void postTask (Task task) {
-		scheduleTask(task, 0, 0, 0);
+	public Task postTask (Task task) {
+		return scheduleTask(task, 0, 0, 0);
 	}
 
 	/** Schedules a task to occur once after the specified delay. */
-	public void scheduleTask (Task task, float delaySeconds) {
-		scheduleTask(task, delaySeconds, 0, 0);
+	public Task scheduleTask (Task task, float delaySeconds) {
+		return scheduleTask(task, delaySeconds, 0, 0);
 	}
 
 	/** Schedules a task to occur once after the specified delay and then repeatedly at the specified interval until cancelled. */
-	public void scheduleTask (Task task, float delaySeconds, float intervalSeconds) {
-		scheduleTask(task, delaySeconds, intervalSeconds, FOREVER);
+	public Task scheduleTask (Task task, float delaySeconds, float intervalSeconds) {
+		return scheduleTask(task, delaySeconds, intervalSeconds, FOREVER);
 	}
 
-	/** Schedules a task to occur once after the specified delay and then a number of additional times at the specified interval. */
-	public void scheduleTask (Task task, float delaySeconds, float intervalSeconds, int repeatCount) {
+	/** Schedules a task to occur once after the specified delay and then a number of additional times at the specified
+	 * interval. */
+	public Task scheduleTask (Task task, float delaySeconds, float intervalSeconds, int repeatCount) {
 		if (task.repeatCount != CANCELLED) throw new IllegalArgumentException("The same task may not be scheduled twice.");
 		task.executeTimeMillis = TimeUtils.nanoTime() / 1000000 + (long)(delaySeconds * 1000);
 		task.intervalMillis = (long)(intervalSeconds * 1000);
@@ -69,6 +70,7 @@ public class Timer {
 			tasks.add(task);
 		}
 		wake();
+		return task;
 	}
 
 	/** Stops the timer, tasks will not be executed and time that passes will not be applied to the task delays. */
@@ -94,6 +96,14 @@ public class Timer {
 			for (int i = 0, n = tasks.size; i < n; i++)
 				tasks.get(i).cancel();
 			tasks.clear();
+		}
+	}
+
+	/** Returns true if the timer has no tasks in the queue. Note that this can change at any time. Synchronize on the timer
+	 * instance to prevent tasks being added, removed, or updated. */
+	public boolean isEmpty () {
+		synchronized (this) {
+			return tasks.size == 0;
 		}
 	}
 
@@ -144,26 +154,26 @@ public class Timer {
 
 	/** Schedules a task on {@link #instance}.
 	 * @see #postTask(Task) */
-	static public void post (Task task) {
-		instance().postTask(task);
+	static public Task post (Task task) {
+		return instance().postTask(task);
 	}
 
 	/** Schedules a task on {@link #instance}.
 	 * @see #scheduleTask(Task, float) */
-	static public void schedule (Task task, float delaySeconds) {
-		instance().scheduleTask(task, delaySeconds);
+	static public Task schedule (Task task, float delaySeconds) {
+		return instance().scheduleTask(task, delaySeconds);
 	}
 
 	/** Schedules a task on {@link #instance}.
 	 * @see #scheduleTask(Task, float, float) */
-	static public void schedule (Task task, float delaySeconds, float intervalSeconds) {
-		instance().scheduleTask(task, delaySeconds, intervalSeconds);
+	static public Task schedule (Task task, float delaySeconds, float intervalSeconds) {
+		return instance().scheduleTask(task, delaySeconds, intervalSeconds);
 	}
 
 	/** Schedules a task on {@link #instance}.
 	 * @see #scheduleTask(Task, float, float, int) */
-	static public void schedule (Task task, float delaySeconds, float intervalSeconds, int repeatCount) {
-		instance().scheduleTask(task, delaySeconds, intervalSeconds, repeatCount);
+	static public Task schedule (Task task, float delaySeconds, float intervalSeconds, int repeatCount) {
+		return instance().scheduleTask(task, delaySeconds, intervalSeconds, repeatCount);
 	}
 
 	/** Runnable with a cancel method.
@@ -174,7 +184,8 @@ public class Timer {
 		long intervalMillis;
 		int repeatCount = CANCELLED;
 
-		/** If this is the last time the task will be ran or the task is first cancelled, it may be scheduled again in this method. */
+		/** If this is the last time the task will be ran or the task is first cancelled, it may be scheduled again in this
+		 * method. */
 		abstract public void run ();
 
 		/** Cancels the task. It will not be executed until it is scheduled again. This method can be called at any time. */
@@ -194,7 +205,7 @@ public class Timer {
 		}
 	}
 
-	/** Manages the single timer thread. Stops thread on libgdx application pause and dispose, starts thread on resume.
+	/** Manages the single timer thread. Stops thread on libGDX application pause and dispose, starts thread on resume.
 	 * @author Nathan Sweet */
 	static class TimerThread extends com.google.gwt.user.client.Timer implements Runnable, LifecycleListener {
 		private Application app;
@@ -208,7 +219,7 @@ public class Timer {
 		public void run () {
 			synchronized (instances) {
 				if (app != Gdx.app) return;
-				
+
 				long timeMillis = TimeUtils.nanoTime() / 1000000;
 				long waitMillis = 5000;
 				for (int i = 0, n = instances.size; i < n; i++) {
@@ -218,9 +229,9 @@ public class Timer {
 						throw new GdxRuntimeException("Task failed: " + instances.get(i).getClass().getName(), ex);
 					}
 				}
-				
+
 				if (app != Gdx.app) return;
-				
+
 				schedule((int)Math.max(0, waitMillis));
 			}
 		}

@@ -16,15 +16,9 @@
 
 package com.badlogic.gdx.net;
 
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
 
 import com.badlogic.gdx.Net.Protocol;
-import com.badlogic.gdx.net.ServerSocket;
-import com.badlogic.gdx.net.ServerSocketHints;
-import com.badlogic.gdx.net.Socket;
-import com.badlogic.gdx.net.SocketHints;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 
 /** Server socket implementation using java.net.ServerSocket.
@@ -38,6 +32,10 @@ public class NetJavaServerSocketImpl implements ServerSocket {
 	private java.net.ServerSocket server;
 
 	public NetJavaServerSocketImpl (Protocol protocol, int port, ServerSocketHints hints) {
+		this(protocol, null, port, hints);
+	}
+
+	public NetJavaServerSocketImpl (Protocol protocol, String hostname, int port, ServerSocketHints hints) {
 		this.protocol = protocol;
 
 		// create the server socket
@@ -53,7 +51,13 @@ public class NetJavaServerSocketImpl implements ServerSocket {
 			}
 
 			// and bind the server...
-			InetSocketAddress address = new InetSocketAddress(port);
+			InetSocketAddress address;
+			if (hostname != null) {
+				address = new InetSocketAddress(hostname, port);
+			} else {
+				address = new InetSocketAddress(port);
+			}
+
 			if (hints != null) {
 				server.bind(address, hints.backlog);
 			} else {

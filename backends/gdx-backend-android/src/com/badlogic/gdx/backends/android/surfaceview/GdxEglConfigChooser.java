@@ -37,11 +37,10 @@ public class GdxEglConfigChooser implements GLSurfaceView.EGLConfigChooser {
 	protected int mDepthSize;
 	protected int mStencilSize;
 	protected int mNumSamples;
-	protected boolean mUseGL20;
 	protected final int[] mConfigAttribs;
 	private int[] mValue = new int[1];
 
-	public GdxEglConfigChooser (int r, int g, int b, int a, int depth, int stencil, int numSamples, boolean useGL20) {
+	public GdxEglConfigChooser (int r, int g, int b, int a, int depth, int stencil, int numSamples) {
 		mRedSize = r;
 		mGreenSize = g;
 		mBlueSize = b;
@@ -49,14 +48,9 @@ public class GdxEglConfigChooser implements GLSurfaceView.EGLConfigChooser {
 		mDepthSize = depth;
 		mStencilSize = stencil;
 		mNumSamples = numSamples;
-		mUseGL20 = useGL20;
 
-		if (useGL20) {
-			mConfigAttribs = new int[] {EGL10.EGL_RED_SIZE, 4, EGL10.EGL_GREEN_SIZE, 4, EGL10.EGL_BLUE_SIZE, 4,
-				EGL10.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL10.EGL_NONE};
-		} else {
-			mConfigAttribs = new int[] {EGL10.EGL_RED_SIZE, 4, EGL10.EGL_GREEN_SIZE, 4, EGL10.EGL_BLUE_SIZE, 4, EGL10.EGL_NONE};
-		}
+		mConfigAttribs = new int[] {EGL10.EGL_RED_SIZE, 4, EGL10.EGL_GREEN_SIZE, 4, EGL10.EGL_BLUE_SIZE, 4,
+			EGL10.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL10.EGL_NONE};
 	}
 
 	public EGLConfig chooseConfig (EGL10 egl, EGLDisplay display) {
@@ -88,7 +82,7 @@ public class GdxEglConfigChooser implements GLSurfaceView.EGLConfigChooser {
 	public EGLConfig chooseConfig (EGL10 egl, EGLDisplay display, EGLConfig[] configs) {
 		EGLConfig best = null;
 		EGLConfig bestAA = null;
-		EGLConfig safe = null; //default back to 565 when no exact match found
+		EGLConfig safe = null; // default back to 565 when no exact match found
 
 		for (EGLConfig config : configs) {
 			int d = findConfigAttrib(egl, display, config, EGL10.EGL_DEPTH_SIZE, 0);
@@ -146,7 +140,7 @@ public class GdxEglConfigChooser implements GLSurfaceView.EGLConfigChooser {
 
 		if (bestAA != null)
 			return bestAA;
-		else if (best!=null)
+		else if (best != null)
 			return best;
 		else
 			return safe;
@@ -172,8 +166,7 @@ public class GdxEglConfigChooser implements GLSurfaceView.EGLConfigChooser {
 		int[] attributes = {EGL10.EGL_BUFFER_SIZE, EGL10.EGL_ALPHA_SIZE, EGL10.EGL_BLUE_SIZE, EGL10.EGL_GREEN_SIZE,
 			EGL10.EGL_RED_SIZE, EGL10.EGL_DEPTH_SIZE, EGL10.EGL_STENCIL_SIZE, EGL10.EGL_CONFIG_CAVEAT, EGL10.EGL_CONFIG_ID,
 			EGL10.EGL_LEVEL, EGL10.EGL_MAX_PBUFFER_HEIGHT, EGL10.EGL_MAX_PBUFFER_PIXELS, EGL10.EGL_MAX_PBUFFER_WIDTH,
-			EGL10.EGL_NATIVE_RENDERABLE, EGL10.EGL_NATIVE_VISUAL_ID, EGL10.EGL_NATIVE_VISUAL_TYPE,
-			0x3030, // EGL10.EGL_PRESERVED_RESOURCES,
+			EGL10.EGL_NATIVE_RENDERABLE, EGL10.EGL_NATIVE_VISUAL_ID, EGL10.EGL_NATIVE_VISUAL_TYPE, 0x3030, // EGL10.EGL_PRESERVED_RESOURCES,
 			EGL10.EGL_SAMPLES, EGL10.EGL_SAMPLE_BUFFERS, EGL10.EGL_SURFACE_TYPE, EGL10.EGL_TRANSPARENT_TYPE,
 			EGL10.EGL_TRANSPARENT_RED_VALUE, EGL10.EGL_TRANSPARENT_GREEN_VALUE, EGL10.EGL_TRANSPARENT_BLUE_VALUE, 0x3039, // EGL10.EGL_BIND_TO_TEXTURE_RGB,
 			0x303A, // EGL10.EGL_BIND_TO_TEXTURE_RGBA,
@@ -198,7 +191,7 @@ public class GdxEglConfigChooser implements GLSurfaceView.EGLConfigChooser {
 			if (egl.eglGetConfigAttrib(display, config, attribute, value)) {
 				Log.w(TAG, String.format("  %s: %d\n", name, value[0]));
 			} else {
-				// Log.w(TAG, String.format("  %s: failed\n", name));
+				// Log.w(TAG, String.format(" %s: failed\n", name));
 				egl.eglGetError();
 // while (egl.eglGetError() != EGL10.EGL_SUCCESS)
 // ;

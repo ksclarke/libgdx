@@ -29,14 +29,19 @@ import com.badlogic.gdx.math.collision.BoundingBox;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.GdxRuntimeException;
+import com.badlogic.gdx.utils.ObjectMap;
 import com.badlogic.gdx.utils.StreamUtils;
 
-/** See <a href="http://www.badlogicgames.com/wordpress/?p=1255">http://www.badlogicgames.com/wordpress/?p=1255</a>
+/** See <a href=
+ * "https://web.archive.org/web/20200427191041/http://www.badlogicgames.com/wordpress/?p=12555">http://www.badlogicgames.com/wordpress/?p=12555</a>
  * @author mzechner */
 public class ParticleEffect implements Disposable {
 	private final Array<ParticleEmitter> emitters;
 	private BoundingBox bounds;
 	private boolean ownsTexture;
+	protected float xSizeScale = 1f;
+	protected float ySizeScale = 1f;
+	protected float motionScale = 1f;
 
 	public ParticleEffect () {
 		emitters = new Array(8);
@@ -45,7 +50,7 @@ public class ParticleEffect implements Disposable {
 	public ParticleEffect (ParticleEffect effect) {
 		emitters = new Array(true, effect.emitters.size);
 		for (int i = 0, n = effect.emitters.size; i < n; i++)
-			emitters.add(new ParticleEmitter(effect.emitters.get(i)));
+			emitters.add(newEmitter(effect.emitters.get(i)));
 	}
 
 	public void start () {
@@ -53,9 +58,30 @@ public class ParticleEffect implements Disposable {
 			emitters.get(i).start();
 	}
 
+	/** Resets the effect so it can be started again like a new effect. Any changes to scale are reverted. See
+	 * {@link #reset(boolean)}. */
 	public void reset () {
+		reset(true, true);
+	}
+
+	/** Resets the effect so it can be started again like a new effect.
+	 * @param resetScaling Whether to restore the original size and motion parameters if they were scaled. Repeated scaling and
+	 *           resetting may introduce error. */
+	public void reset (boolean resetScaling) {
+		reset(resetScaling, true);
+	}
+
+	/** Resets the effect so it can be started again like a new effect.
+	 * @param resetScaling Whether to restore the original size and motion parameters if they were scaled. Repeated scaling and
+	 *           resetting may introduce error.
+	 * @param start Whether to start the effect after resetting. */
+	public void reset (boolean resetScaling, boolean start) {
 		for (int i = 0, n = emitters.size; i < n; i++)
-			emitters.get(i).reset();
+			emitters.get(i).reset(start);
+		if (resetScaling && (xSizeScale != 1f || ySizeScale != 1f || motionScale != 1f)) {
+			scaleEffect(1f / xSizeScale, 1f / ySizeScale, 1f / motionScale);
+			xSizeScale = ySizeScale = motionScale = 1f;
+		}
 	}
 
 	public void update (float delta) {
@@ -123,14 +149,19 @@ public class ParticleEffect implements Disposable {
 		return null;
 	}
 
+	/** Allocates all emitters particles. See {@link com.badlogic.gdx.graphics.g2d.ParticleEmitter#preAllocateParticles()} */
+	public void preAllocateParticles () {
+		for (ParticleEmitter emitter : emitters) {
+			emitter.preAllocateParticles();
+		}
+	}
+
 	public void save (Writer output) throws IOException {
 		int index = 0;
 		for (int i = 0, n = emitters.size; i < n; i++) {
 			ParticleEmitter emitter = emitters.get(i);
-			if (index++ > 0) output.write("\n\n");
+			if (index++ > 0) output.write("\n");
 			emitter.save(output);
-			output.write("- Image Path -\n");
-			output.write(emitter.getImagePath() + "\n");
 		}
 	}
 
@@ -140,8 +171,12 @@ public class ParticleEffect implements Disposable {
 	}
 
 	public void load (FileHandle effectFile, TextureAtlas atlas) {
+		load(effectFile, atlas, null);
+	}
+
+	public void load (FileHandle effectFile, TextureAtlas atlas, String atlasPrefix) {
 		loadEmitters(effectFile);
-		loadEmitterImages(atlas);
+		loadEmitterImages(atlas, atlasPrefix);
 	}
 
 	public void loadEmitters (FileHandle effectFile) {
@@ -151,11 +186,8 @@ public class ParticleEffect implements Disposable {
 		try {
 			reader = new BufferedReader(new InputStreamReader(input), 512);
 			while (true) {
-				ParticleEmitter emitter = new ParticleEmitter(reader);
-				reader.readLine();
-				emitter.setImagePath(reader.readLine());
+				ParticleEmitter emitter = newEmitter(reader);
 				emitters.add(emitter);
-				if (reader.readLine() == null) break;
 				if (reader.readLine() == null) break;
 			}
 		} catch (IOException ex) {
@@ -166,28 +198,53 @@ public class ParticleEffect implements Disposable {
 	}
 
 	public void loadEmitterImages (TextureAtlas atlas) {
+		loadEmitterImages(atlas, null);
+	}
+
+	public void loadEmitterImages (TextureAtlas atlas, String atlasPrefix) {
 		for (int i = 0, n = emitters.size; i < n; i++) {
 			ParticleEmitter emitter = emitters.get(i);
-			String imagePath = emitter.getImagePath();
-			if (imagePath == null) continue;
-			String imageName = new File(imagePath.replace('\\', '/')).getName();
-			int lastDotIndex = imageName.lastIndexOf('.');
-			if (lastDotIndex != -1) imageName = imageName.substring(0, lastDotIndex);
-			Sprite sprite = atlas.createSprite(imageName);
-			if (sprite == null) throw new IllegalArgumentException("SpriteSheet missing image: " + imageName);
-			emitter.setSprite(sprite);
+			if (emitter.getImagePaths().size == 0) continue;
+			Array<Sprite> sprites = new Array<Sprite>();
+			for (String imagePath : emitter.getImagePaths()) {
+				String imageName = new File(imagePath.replace('\\', '/')).getName();
+				int lastDotIndex = imageName.lastIndexOf('.');
+				if (lastDotIndex != -1) imageName = imageName.substring(0, lastDotIndex);
+				if (atlasPrefix != null) imageName = atlasPrefix + imageName;
+				Sprite sprite = atlas.createSprite(imageName);
+				if (sprite == null) throw new IllegalArgumentException("Atlas is missing region: " + imageName);
+				sprites.add(sprite);
+			}
+			emitter.setSprites(sprites);
 		}
 	}
 
 	public void loadEmitterImages (FileHandle imagesDir) {
 		ownsTexture = true;
+		ObjectMap<String, Sprite> loadedSprites = new ObjectMap<String, Sprite>(emitters.size);
 		for (int i = 0, n = emitters.size; i < n; i++) {
 			ParticleEmitter emitter = emitters.get(i);
-			String imagePath = emitter.getImagePath();
-			if (imagePath == null) continue;
-			String imageName = new File(imagePath.replace('\\', '/')).getName();
-			emitter.setSprite(new Sprite(loadTexture(imagesDir.child(imageName))));
+			if (emitter.getImagePaths().size == 0) continue;
+			Array<Sprite> sprites = new Array<Sprite>();
+			for (String imagePath : emitter.getImagePaths()) {
+				String imageName = new File(imagePath.replace('\\', '/')).getName();
+				Sprite sprite = loadedSprites.get(imageName);
+				if (sprite == null) {
+					sprite = new Sprite(loadTexture(imagesDir.child(imageName)));
+					loadedSprites.put(imageName, sprite);
+				}
+				sprites.add(sprite);
+			}
+			emitter.setSprites(sprites);
 		}
+	}
+
+	protected ParticleEmitter newEmitter (BufferedReader reader) throws IOException {
+		return new ParticleEmitter(reader);
+	}
+
+	protected ParticleEmitter newEmitter (ParticleEmitter emitter) {
+		return new ParticleEmitter(emitter);
 	}
 
 	protected Texture loadTexture (FileHandle file) {
@@ -199,7 +256,9 @@ public class ParticleEffect implements Disposable {
 		if (!ownsTexture) return;
 		for (int i = 0, n = emitters.size; i < n; i++) {
 			ParticleEmitter emitter = emitters.get(i);
-			emitter.getSprite().getTexture().dispose();
+			for (Sprite sprite : emitter.getSprites()) {
+				sprite.getTexture().dispose();
+			}
 		}
 	}
 
@@ -212,5 +271,41 @@ public class ParticleEffect implements Disposable {
 		for (ParticleEmitter emitter : this.emitters)
 			bounds.ext(emitter.getBoundingBox());
 		return bounds;
+	}
+
+	/** Permanently scales all the size and motion parameters of all the emitters in this effect. If this effect originated from a
+	 * {@link ParticleEffectPool}, the scale will be reset when it is returned to the pool. */
+	public void scaleEffect (float scaleFactor) {
+		scaleEffect(scaleFactor, scaleFactor, scaleFactor);
+	}
+
+	/** Permanently scales all the size and motion parameters of all the emitters in this effect. If this effect originated from a
+	 * {@link ParticleEffectPool}, the scale will be reset when it is returned to the pool. */
+	public void scaleEffect (float scaleFactor, float motionScaleFactor) {
+		scaleEffect(scaleFactor, scaleFactor, motionScaleFactor);
+	}
+
+	/** Permanently scales all the size and motion parameters of all the emitters in this effect. If this effect originated from a
+	 * {@link ParticleEffectPool}, the scale will be reset when it is returned to the pool. */
+	public void scaleEffect (float xSizeScaleFactor, float ySizeScaleFactor, float motionScaleFactor) {
+		xSizeScale *= xSizeScaleFactor;
+		ySizeScale *= ySizeScaleFactor;
+		motionScale *= motionScaleFactor;
+		for (ParticleEmitter particleEmitter : emitters) {
+			particleEmitter.scaleSize(xSizeScaleFactor, ySizeScaleFactor);
+			particleEmitter.scaleMotion(motionScaleFactor);
+		}
+	}
+
+	/** Sets the {@link com.badlogic.gdx.graphics.g2d.ParticleEmitter#setCleansUpBlendFunction(boolean) cleansUpBlendFunction}
+	 * parameter on all {@link com.badlogic.gdx.graphics.g2d.ParticleEmitter ParticleEmitters} currently in this ParticleEffect.
+	 * <p>
+	 * IMPORTANT: If set to false and if the next object to use this Batch expects alpha blending, you are responsible for setting
+	 * the Batch's blend function to (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) before that next object is drawn.
+	 * @param cleanUpBlendFunction */
+	public void setEmittersCleanUpBlendFunction (boolean cleanUpBlendFunction) {
+		for (int i = 0, n = emitters.size; i < n; i++) {
+			emitters.get(i).setCleansUpBlendFunction(cleanUpBlendFunction);
+		}
 	}
 }

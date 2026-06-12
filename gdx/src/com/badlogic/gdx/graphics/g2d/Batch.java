@@ -14,17 +14,17 @@
  * limitations under the License.
  ******************************************************************************/
 
-
 package com.badlogic.gdx.graphics.g2d;
 
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
+import com.badlogic.gdx.math.Affine2;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.utils.Disposable;
 
-/** A Batch is used to draw 2D rectangles that reference a texture (region). The class will batch the drawing commands and optimize
- * them for processing by the GPU.
+/** A Batch is used to draw 2D rectangles that reference a texture (region). The class will batch the drawing commands and
+ * optimize them for processing by the GPU.
  * <p>
  * To draw something with a Batch one has to first call the {@link Batch#begin()} method which will setup appropriate render
  * states. When you are done with drawing you have to call {@link Batch#end()} which will actually draw the things you specified.
@@ -39,14 +39,14 @@ import com.badlogic.gdx.utils.Disposable;
  * <p>
  * A Batch is a pretty heavy object so you should only ever have one in your program.
  * <p>
- * A Batch works with OpenGL ES 1.x and 2.0. In the case of a 2.0 context it will use its own custom shader to draw all provided
- * sprites. You can set your own custom shader via {@link #setShader(ShaderProgram)}.
+ * A Batch works with OpenGL ES 2.0. It will use its own custom shader to draw all provided sprites. You can set your own custom
+ * shader via {@link #setShader(ShaderProgram)}.
  * <p>
  * A Batch has to be disposed if it is no longer used.
  * @author mzechner
  * @author Nathan Sweet */
 public interface Batch extends Disposable {
-	/** Sets up the Batch for drawing. This will disable depth buffer writting. It enables blending and texturing. If you have more
+	/** Sets up the Batch for drawing. This will disable depth buffer writing. It enables blending and texturing. If you have more
 	 * texture units enabled than the first one you have to disable them before calling this. Uses a screen coordinate system by
 	 * default where everything is given in pixels. You can specify your own projection and modelview matrices via
 	 * {@link #setProjectionMatrix(Matrix4)} and {@link #setTransformMatrix(Matrix4)}. */
@@ -62,18 +62,24 @@ public interface Batch extends Disposable {
 	/** @see #setColor(Color) */
 	public void setColor (float r, float g, float b, float a);
 
-	/** @see #setColor(Color)
-	 * @see Color#toFloatBits() */
-	public void setColor (float color);
-
-	/** @return the rendering color of this Batch. Manipulating the returned instance has no effect. */
+	/** @return the rendering color of this Batch. If the returned instance is manipulated, {@link #setColor(Color)} must be called
+	 *         afterward. */
 	public Color getColor ();
 
-	/** Draws a rectangle with the bottom left corner at x,y having the given width and height in pixels. The rectangle is offset by
-	 * originX, originY relative to the origin. Scale specifies the scaling factor by which the rectangle should be scaled around
-	 * originX, originY. Rotation specifies the angle of counter clockwise rotation of the rectangle around originX, originY. The
-	 * portion of the {@link Texture} given by srcX, srcY and srcWidth, srcHeight is used. These coordinates and sizes are given in
-	 * texels. FlipX and flipY specify whether the texture portion should be fliped horizontally or vertically.
+	/** Sets the rendering color of this Batch, expanding the alpha from 0-254 to 0-255.
+	 * @see #setColor(Color)
+	 * @see Color#toFloatBits() */
+	public void setPackedColor (float packedColor);
+
+	/** @return the rendering color of this Batch in vertex format (alpha compressed to 0-254)
+	 * @see Color#toFloatBits() */
+	public float getPackedColor ();
+
+	/** Draws a rectangle with the bottom left corner at x,y having the given width and height in pixels. The rectangle is offset
+	 * by originX, originY relative to the origin. Scale specifies the scaling factor by which the rectangle should be scaled
+	 * around originX, originY. Rotation specifies the angle of counter clockwise rotation of the rectangle around originX,
+	 * originY. The portion of the {@link Texture} given by srcX, srcY and srcWidth, srcHeight is used. These coordinates and sizes
+	 * are given in texels. FlipX and flipY specify whether the texture portion should be flipped horizontally or vertically.
 	 * @param x the x-coordinate in screen space
 	 * @param y the y-coordinate in screen space
 	 * @param originX the x-coordinate of the scaling and rotation origin relative to the screen space coordinates
@@ -82,7 +88,7 @@ public interface Batch extends Disposable {
 	 * @param height the height in pixels
 	 * @param scaleX the scale of the rectangle around originX/originY in x
 	 * @param scaleY the scale of the rectangle around originX/originY in y
-	 * @param rotation the angle of counter clockwise rotation of the rectangle around originX/originY
+	 * @param rotation the angle of counter clockwise rotation of the rectangle around originX/originY, in degrees
 	 * @param srcX the x-coordinate in texel space
 	 * @param srcY the y-coordinate in texel space
 	 * @param srcWidth the source with in texels
@@ -94,7 +100,7 @@ public interface Batch extends Disposable {
 
 	/** Draws a rectangle with the bottom left corner at x,y having the given width and height in pixels. The portion of the
 	 * {@link Texture} given by srcX, srcY and srcWidth, srcHeight is used. These coordinates and sizes are given in texels. FlipX
-	 * and flipY specify whether the texture portion should be fliped horizontally or vertically.
+	 * and flipY specify whether the texture portion should be flipped horizontally or vertically.
 	 * @param x the x-coordinate in screen space
 	 * @param y the y-coordinate in screen space
 	 * @param width the width in pixels
@@ -135,8 +141,8 @@ public interface Batch extends Disposable {
 	/** Draws a rectangle with the bottom left corner at x,y and stretching the region to cover the given width and height. */
 	public void draw (Texture texture, float x, float y, float width, float height);
 
-	/** Draws a rectangle using the given vertices. There must be 4 vertices, each made up of 5 elements in this order: x, y, color,
-	 * u, v. The {@link #getColor()} from the Batch is not applied. */
+	/** Draws a rectangle using the given vertices. There must be 4 vertices, each made up of 5 elements in this order: x, y,
+	 * color, u, v. The {@link #getColor()} from the Batch is not applied. */
 	public void draw (Texture texture, float[] spriteVertices, int offset, int count);
 
 	/** Draws a rectangle with the bottom left corner at x,y having the width and height of the region. */
@@ -148,7 +154,8 @@ public interface Batch extends Disposable {
 	/** Draws a rectangle with the bottom left corner at x,y and stretching the region to cover the given width and height. The
 	 * rectangle is offset by originX, originY relative to the origin. Scale specifies the scaling factor by which the rectangle
 	 * should be scaled around originX, originY. Rotation specifies the angle of counter clockwise rotation of the rectangle around
-	 * originX, originY. */
+	 * originX, originY.
+	 * @param rotation rotation in degrees */
 	public void draw (TextureRegion region, float x, float y, float originX, float originY, float width, float height,
 		float scaleX, float scaleY, float rotation);
 
@@ -156,10 +163,14 @@ public interface Batch extends Disposable {
 	 * to cover the given width and height. The rectangle is offset by originX, originY relative to the origin. Scale specifies the
 	 * scaling factor by which the rectangle should be scaled around originX, originY. Rotation specifies the angle of counter
 	 * clockwise rotation of the rectangle around originX, originY.
+	 * @param rotation rotation in degrees
 	 * @param clockwise If true, the texture coordinates are rotated 90 degrees clockwise. If false, they are rotated 90 degrees
 	 *           counter clockwise. */
 	public void draw (TextureRegion region, float x, float y, float originX, float originY, float width, float height,
 		float scaleX, float scaleY, float rotation, boolean clockwise);
+
+	/** Draws a rectangle transformed by the given matrix. */
+	public void draw (TextureRegion region, float width, float height, Affine2 transform);
 
 	/** Causes any pending sprites to be rendered, without ending the Batch. */
 	public void flush ();
@@ -171,32 +182,45 @@ public interface Batch extends Disposable {
 	public void enableBlending ();
 
 	/** Sets the blending function to be used when rendering sprites.
-	 * @param srcFunc the source function, e.g. GL11.GL_SRC_ALPHA. If set to -1, Batch won't change the blending function.
-	 * @param dstFunc the destination function, e.g. GL11.GL_ONE_MINUS_SRC_ALPHA */
+	 * @param srcFunc the source function, e.g. GL20.GL_SRC_ALPHA. If set to -1, Batch won't change the blending function.
+	 * @param dstFunc the destination function, e.g. GL20.GL_ONE_MINUS_SRC_ALPHA */
 	public void setBlendFunction (int srcFunc, int dstFunc);
+
+	/** Sets separate (color/alpha) blending function to be used when rendering sprites.
+	 * @param srcFuncColor the source color function, e.g. GL20.GL_SRC_ALPHA. If set to -1, Batch won't change the blending
+	 *           function.
+	 * @param dstFuncColor the destination color function, e.g. GL20.GL_ONE_MINUS_SRC_ALPHA.
+	 * @param srcFuncAlpha the source alpha function, e.g. GL20.GL_SRC_ALPHA.
+	 * @param dstFuncAlpha the destination alpha function, e.g. GL20.GL_ONE_MINUS_SRC_ALPHA. */
+	public void setBlendFunctionSeparate (int srcFuncColor, int dstFuncColor, int srcFuncAlpha, int dstFuncAlpha);
 
 	public int getBlendSrcFunc ();
 
 	public int getBlendDstFunc ();
 
-	/** Returns the current projection matrix. Changing this within {@link #begin()}/{@link #end()} results in undefined behaviour. */
+	public int getBlendSrcFuncAlpha ();
+
+	public int getBlendDstFuncAlpha ();
+
+	/** Returns the current projection matrix. Changing this within {@link #begin()}/{@link #end()} results in undefined
+	 * behaviour. */
 	public Matrix4 getProjectionMatrix ();
 
-	/** Returns the current transform matrix. Changing this within {@link #begin()}/{@link #end()} results in undefined behaviour. */
+	/** Returns the current transform matrix. Changing this within {@link #begin()}/{@link #end()} results in undefined
+	 * behaviour. */
 	public Matrix4 getTransformMatrix ();
 
 	/** Sets the projection matrix to be used by this Batch. If this is called inside a {@link #begin()}/{@link #end()} block, the
 	 * current batch is flushed to the gpu. */
 	public void setProjectionMatrix (Matrix4 projection);
 
-	/** Sets the transform matrix to be used by this Batch. If this is called inside a {@link #begin()}/{@link #end()} block, the
-	 * current batch is flushed to the gpu. */
+	/** Sets the transform matrix to be used by this Batch. */
 	public void setTransformMatrix (Matrix4 transform);
 
 	/** Sets the shader to be used in a GLES 2.0 environment. Vertex position attribute is called "a_position", the texture
 	 * coordinates attribute is called "a_texCoord0", the color attribute is called "a_color". See
 	 * {@link ShaderProgram#POSITION_ATTRIBUTE}, {@link ShaderProgram#COLOR_ATTRIBUTE} and {@link ShaderProgram#TEXCOORD_ATTRIBUTE}
-	 * which gets "0" appened to indicate the use of the first texture unit. The combined transform and projection matrx is
+	 * which gets "0" appended to indicate the use of the first texture unit. The combined transform and projection matrx is
 	 * uploaded via a mat4 uniform called "u_projTrans". The texture sampler is passed via a uniform called "u_texture".
 	 * <p>
 	 * Call this method with a null argument to use the default shader.
@@ -206,8 +230,14 @@ public interface Batch extends Disposable {
 	 * @param shader the {@link ShaderProgram} or null to use the default shader. */
 	public void setShader (ShaderProgram shader);
 
+	/** @return the current {@link ShaderProgram} set by {@link #setShader(ShaderProgram)} or the defaultShader */
+	public ShaderProgram getShader ();
+
 	/** @return true if blending for sprites is enabled */
 	public boolean isBlendingEnabled ();
+
+	/** @return true if currently between begin and end. */
+	public boolean isDrawing ();
 
 	static public final int X1 = 0;
 	static public final int Y1 = 1;

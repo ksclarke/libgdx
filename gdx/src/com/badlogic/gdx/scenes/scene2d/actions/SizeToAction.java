@@ -23,12 +23,23 @@ public class SizeToAction extends TemporalAction {
 	private float endWidth, endHeight;
 
 	protected void begin () {
-		startWidth = actor.getWidth();
-		startHeight = actor.getHeight();
+		startWidth = target.getWidth();
+		startHeight = target.getHeight();
 	}
 
 	protected void update (float percent) {
-		actor.setSize(startWidth + (endWidth - startWidth) * percent, startHeight + (endHeight - startHeight) * percent);
+		float width, height;
+		if (percent == 0) {
+			width = startWidth;
+			height = startHeight;
+		} else if (percent == 1) {
+			width = endWidth;
+			height = endHeight;
+		} else {
+			width = startWidth + (endWidth - startWidth) * percent;
+			height = startHeight + (endHeight - startHeight) * percent;
+		}
+		target.setSize(width, height);
 	}
 
 	public void setSize (float width, float height) {

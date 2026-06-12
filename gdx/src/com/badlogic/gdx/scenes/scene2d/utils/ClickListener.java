@@ -16,11 +16,11 @@
 
 package com.badlogic.gdx.scenes.scene2d.utils;
 
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input.Buttons;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.InputListener;
+import com.badlogic.gdx.utils.Null;
 import com.badlogic.gdx.utils.TimeUtils;
 
 /** Detects mouse over, mouse or finger touch presses, and clicks on an actor. A touch must go down over the actor and is
@@ -30,11 +30,15 @@ import com.badlogic.gdx.utils.TimeUtils;
  * touch downs are ignored.
  * @author Nathan Sweet */
 public class ClickListener extends InputListener {
+	/** Time in seconds {@link #isVisualPressed()} reports true after a press resulting in a click is released. */
+	static public float visualPressedDuration = 0.1f;
+
 	private float tapSquareSize = 14, touchDownX = -1, touchDownY = -1;
 	private int pressedPointer = -1;
 	private int pressedButton = -1;
 	private int button;
-	private boolean pressed, over, cancelled;
+	private boolean pressed, over, cancelled, cancelledOver;
+	private long visualPressedTime;
 	private long tapCountInterval = (long)(0.4f * 1000000000l);
 	private int tapCount;
 	private long lastTapTime;
@@ -57,14 +61,13 @@ public class ClickListener extends InputListener {
 		pressedButton = button;
 		touchDownX = x;
 		touchDownY = y;
-		over = false;
+		setVisualPressed(true);
 		return true;
 	}
 
 	public void touchDragged (InputEvent event, float x, float y, int pointer) {
 		if (pointer != pressedPointer || cancelled) return;
 		pressed = isOver(event.getListenerActor(), x, y);
-		if (pressed && pointer == 0 && button != -1 && !Gdx.input.isButtonPressed(button)) pressed = false;
 		if (!pressed) {
 			// Once outside the tap square, don't use the tap square anymore.
 			invalidateTapSquare();
@@ -88,22 +91,34 @@ public class ClickListener extends InputListener {
 			pressed = false;
 			pressedPointer = -1;
 			pressedButton = -1;
+			if (cancelled) over = cancelledOver;
 			cancelled = false;
 		}
 	}
 
-	public void enter (InputEvent event, float x, float y, int pointer, Actor fromActor) {
-		if (pointer == -1 && !cancelled) over = true;
+	public void enter (InputEvent event, float x, float y, int pointer, @Null Actor fromActor) {
+		if (pointer == -1) {
+			if (!cancelled)
+				over = true;
+			else
+				cancelledOver = true;
+		}
 	}
 
-	public void exit (InputEvent event, float x, float y, int pointer, Actor toActor) {
-		if (pointer == -1 && !cancelled) over = false;
+	public void exit (InputEvent event, float x, float y, int pointer, @Null Actor toActor) {
+		if (pointer == -1) {
+			if (!cancelled)
+				over = false;
+			else
+				cancelledOver = false;
+		}
 	}
 
-	/** If a touch down is being monitored, the drag and touch up events are ignored until the next touch up. */
+	/** If a touch down is being monitored, the over state and drag and touch up events are ignored until the next touch up. */
 	public void cancel () {
-		if (pressedPointer == -1) return;
+		if (pressedPointer == -1 || cancelled) return;
 		cancelled = true;
+		cancelledOver = over;
 		over = false;
 		pressed = false;
 	}
@@ -128,7 +143,7 @@ public class ClickListener extends InputListener {
 		return touchDownX != -1;
 	}
 
-	/** The tap square will not longer be used for the current touch. */
+	/** The tap square will no longer be used for the current touch. */
 	public void invalidateTapSquare () {
 		touchDownX = -1;
 		touchDownY = -1;
@@ -137,6 +152,24 @@ public class ClickListener extends InputListener {
 	/** Returns true if a touch is over the actor or within the tap square. */
 	public boolean isPressed () {
 		return pressed;
+	}
+
+	/** Returns true if a touch is over the actor or within the tap square or has been very recently. This allows the UI to show a
+	 * press and release that was so fast it occurred within a single frame. */
+	public boolean isVisualPressed () {
+		if (pressed) return true;
+		if (visualPressedTime <= 0) return false;
+		if (visualPressedTime > TimeUtils.millis()) return true;
+		visualPressedTime = 0;
+		return false;
+	}
+
+	/** If true, sets the visual pressed time to now. If false, clears the visual pressed time. */
+	public void setVisualPressed (boolean visualPressed) {
+		if (visualPressed)
+			visualPressedTime = TimeUtils.millis() + (long)(visualPressedDuration * 1000);
+		else
+			visualPressedTime = 0;
 	}
 
 	/** Returns true if the mouse or touch is over the actor or pressed and within the tap square. */
@@ -152,7 +185,8 @@ public class ClickListener extends InputListener {
 		return tapSquareSize;
 	}
 
-	/** @param tapCountInterval time in seconds that must pass for two touch down/up sequences to be detected as consecutive taps. */
+	/** @param tapCountInterval time in seconds that must pass for two touch down/up sequences to be detected as consecutive
+	 *           taps. */
 	public void setTapCountInterval (float tapCountInterval) {
 		this.tapCountInterval = (long)(tapCountInterval * 1000000000l);
 	}
@@ -160,6 +194,10 @@ public class ClickListener extends InputListener {
 	/** Returns the number of taps within the tap count interval for the most recent click event. */
 	public int getTapCount () {
 		return tapCount;
+	}
+
+	public void setTapCount (int tapCount) {
+		this.tapCount = tapCount;
 	}
 
 	public float getTouchDownX () {

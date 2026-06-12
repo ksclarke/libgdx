@@ -19,7 +19,7 @@ package com.badlogic.gdx.tests;
 import java.util.Random;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.GL10;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteCache;
@@ -27,6 +27,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.tests.utils.GdxTest;
 import com.badlogic.gdx.tests.utils.OrthoCamController;
+import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.TimeUtils;
 
 public class IsometricTileTest extends GdxTest {
@@ -89,12 +90,11 @@ public class IsometricTileTest extends GdxTest {
 
 	@Override
 	public void render () {
-		Gdx.gl.glClearColor(0.7f, 0.7f, 0.7f, 1);
-		Gdx.gl.glClear(GL10.GL_COLOR_BUFFER_BIT);
+		ScreenUtils.clear(0.7f, 0.7f, 0.7f, 1f);
 		cam.update();
 
-		Gdx.gl.glEnable(GL10.GL_BLEND);
-		Gdx.gl.glBlendFunc(GL10.GL_SRC_ALPHA, GL10.GL_ONE_MINUS_SRC_ALPHA);
+		Gdx.gl.glEnable(GL20.GL_BLEND);
+		Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 		for (int i = 0; i < LAYERS; i++) {
 			SpriteCache cache = caches[i];
 			cache.setProjectionMatrix(cam.combined);
@@ -116,10 +116,5 @@ public class IsometricTileTest extends GdxTest {
 		renderer.line(BOUND_X, 0, BOUND_X, BOUND_Y);
 
 		renderer.end();
-	}
-
-	@Override
-	public boolean needsGL20 () {
-		return false;
 	}
 }

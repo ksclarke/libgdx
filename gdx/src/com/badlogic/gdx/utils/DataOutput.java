@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
+
 package com.badlogic.gdx.utils;
 
 import java.io.DataOutputStream;
@@ -57,7 +58,7 @@ public class DataOutput extends DataOutputStream {
 
 	/** Writes a length and then the string as UTF8.
 	 * @param value May be null. */
-	public void writeString (String value) throws IOException {
+	public void writeString (@Null String value) throws IOException {
 		if (value == null) {
 			write(0);
 			return;

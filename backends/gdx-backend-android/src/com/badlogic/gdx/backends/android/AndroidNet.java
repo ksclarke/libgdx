@@ -13,21 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
+
 package com.badlogic.gdx.backends.android;
 
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.net.Uri;
 
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Net;
-import com.badlogic.gdx.Net.HttpRequest;
 import com.badlogic.gdx.net.NetJavaImpl;
+import com.badlogic.gdx.net.NetJavaServerSocketImpl;
+import com.badlogic.gdx.net.NetJavaSocketImpl;
 import com.badlogic.gdx.net.ServerSocket;
 import com.badlogic.gdx.net.ServerSocketHints;
 import com.badlogic.gdx.net.Socket;
 import com.badlogic.gdx.net.SocketHints;
-import com.badlogic.gdx.net.NetJavaSocketImpl;
-import com.badlogic.gdx.net.NetJavaServerSocketImpl;
 
 /** Android implementation of the {@link Net} API.
  * @author acoppes */
@@ -38,19 +39,29 @@ public class AndroidNet implements Net {
 	final AndroidApplicationBase app;
 	NetJavaImpl netJavaImpl;
 
-	public AndroidNet (AndroidApplicationBase activity) {
-		app = activity;
-		netJavaImpl = new NetJavaImpl();
+	public AndroidNet (AndroidApplicationBase app, AndroidApplicationConfiguration configuration) {
+		this.app = app;
+		netJavaImpl = new NetJavaImpl(configuration.maxNetThreads);
 	}
 
 	@Override
 	public void sendHttpRequest (HttpRequest httpRequest, final HttpResponseListener httpResponseListener) {
 		netJavaImpl.sendHttpRequest(httpRequest, httpResponseListener);
 	}
-	
+
 	@Override
 	public void cancelHttpRequest (HttpRequest httpRequest) {
 		netJavaImpl.cancelHttpRequest(httpRequest);
+	}
+
+	@Override
+	public boolean isHttpRequestPending (HttpRequest httpRequest) {
+		return netJavaImpl.isHttpRequestPending(httpRequest);
+	}
+
+	@Override
+	public ServerSocket newServerSocket (Protocol protocol, String hostname, int port, ServerSocketHints hints) {
+		return new NetJavaServerSocketImpl(protocol, hostname, port, hints);
 	}
 
 	@Override
@@ -64,18 +75,19 @@ public class AndroidNet implements Net {
 	}
 
 	@Override
-	public void openURI (String URI) {
-		if(app == null) {
-			Gdx.app.log("AndroidNet", "Can't open browser activity from livewallpaper");
-			return;
-		}
+	public boolean openURI (String URI) {
 		final Uri uri = Uri.parse(URI);
-		app.runOnUiThread(new Runnable() {
-			@Override
-			public void run () {
-				app.startActivity(new Intent(Intent.ACTION_VIEW, uri));
+		try {
+			Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+			// LiveWallpaper and Daydream applications need this flag
+			if (!(app.getContext() instanceof Activity)) {
+				intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 			}
-		});
+			app.startActivity(intent);
+			return true;
+		} catch (ActivityNotFoundException e) {
+			return false;
+		}
 	}
 
 }

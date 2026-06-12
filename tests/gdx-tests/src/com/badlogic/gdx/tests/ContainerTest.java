@@ -2,16 +2,17 @@
 package com.badlogic.gdx.tests;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.GL10;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Container;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.tests.utils.GdxTest;
+import com.badlogic.gdx.utils.ScreenUtils;
 
 public class ContainerTest extends GdxTest {
 	Skin skin;
@@ -23,8 +24,8 @@ public class ContainerTest extends GdxTest {
 		stage = new Stage();
 		Gdx.input.setInputProcessor(stage);
 
-		TextureRegionDrawable logo = new TextureRegionDrawable(new TextureRegion(new Texture(
-			Gdx.files.internal("data/badlogic.jpg"))));
+		TextureRegionDrawable logo = new TextureRegionDrawable(
+			new TextureRegion(new Texture(Gdx.files.internal("data/badlogic.jpg"))));
 
 		Table root = new Table();
 		root.setFillParent(true);
@@ -67,26 +68,36 @@ public class ContainerTest extends GdxTest {
 		Container clip = new Container(label("clip1clip2clip3clip4"));
 		clip.setClip(true);
 		root.add(clip);
+
+		root.row();
+
+		Table cullTable = new Table();
+		cullTable.add(label("cull1")).row();
+		cullTable.add(label("cull2")).row();
+		cullTable.add(label("cull3")).row();
+		cullTable.add(label("cull4")).row();
+		cullTable.add(label("cull5")).row();
+		cullTable.add(label("cull6")).row();
+		cullTable.add(label("cull7")).row();
+		root.add(new ScrollPane(new Container(cullTable).pad(20, 25, 15, 30)));
 	}
 
 	Table label (String text) {
 		Table table = new Table().debug();
-		table.add(new Label(text, skin)).fill().expand();
+		table.add(new Label(text, skin)).grow();
 		return table;
 	}
 
 	@Override
 	public void render () {
-		Gdx.gl.glClearColor(0.2f, 0.2f, 0.2f, 1);
-		Gdx.gl.glClear(GL10.GL_COLOR_BUFFER_BIT);
+		ScreenUtils.clear(0.2f, 0.2f, 0.2f, 1);
 		stage.act();
 		stage.draw();
-		Table.drawDebug(stage);
 	}
 
 	@Override
 	public void resize (int width, int height) {
-		stage.setViewport(width, height, false);
+		stage.getViewport().update(width, height, true);
 	}
 
 	@Override

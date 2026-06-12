@@ -1,12 +1,12 @@
 /*******************************************************************************
  * Copyright 2011 See AUTHORS file.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,8 +16,8 @@
 
 package com.badlogic.gdx.math;
 
-public class Polyline {
-	private final float[] localVertices;
+public class Polyline implements Shape2D {
+	private float[] localVertices;
 	private float[] worldVertices;
 	private float x, y;
 	private float originX, originY;
@@ -28,7 +28,8 @@ public class Polyline {
 	private boolean calculateScaledLength = true;
 	private boolean calculateLength = true;
 	private boolean dirty = true;
-	
+	private Rectangle bounds;
+
 	public Polyline () {
 		this.localVertices = new float[0];
 	}
@@ -37,12 +38,12 @@ public class Polyline {
 		if (vertices.length < 4) throw new IllegalArgumentException("polylines must contain at least 2 points.");
 		this.localVertices = vertices;
 	}
-	
+
 	/** Returns vertices without scaling or rotation and without being offset by the polyline position. */
 	public float[] getVertices () {
 		return localVertices;
 	}
-	
+
 	/** Returns vertices scaled, rotated, and offset by the polygon position. */
 	public float[] getTransformedVertices () {
 		if (!dirty) return worldVertices;
@@ -85,37 +86,37 @@ public class Polyline {
 		}
 		return worldVertices;
 	}
-	
-	/** Returns the euclidian length of the polyline without scaling */
+
+	/** Returns the euclidean length of the polyline without scaling */
 	public float getLength () {
 		if (!calculateLength) return length;
 		calculateLength = false;
-		
+
 		length = 0;
-		for (int i = 0, n = localVertices.length - 2; i < n ; i += 2) {
-			float x = localVertices[i + 2] -  localVertices[i];
-			float y = localVertices[i + 1] -  localVertices[i + 3];
+		for (int i = 0, n = localVertices.length - 2; i < n; i += 2) {
+			float x = localVertices[i + 2] - localVertices[i];
+			float y = localVertices[i + 1] - localVertices[i + 3];
 			length += (float)Math.sqrt(x * x + y * y);
 		}
-		
+
 		return length;
 	}
-	
-	/** Returns the euclidian length of the polyline */
+
+	/** Returns the euclidean length of the polyline */
 	public float getScaledLength () {
 		if (!calculateScaledLength) return scaledLength;
 		calculateScaledLength = false;
-		
+
 		scaledLength = 0;
-		for (int i = 0, n = localVertices.length - 2; i < n ; i += 2) {
+		for (int i = 0, n = localVertices.length - 2; i < n; i += 2) {
 			float x = localVertices[i + 2] * scaleX - localVertices[i] * scaleX;
 			float y = localVertices[i + 1] * scaleY - localVertices[i + 3] * scaleY;
 			scaledLength += (float)Math.sqrt(x * x + y * y);
 		}
-		
+
 		return scaledLength;
 	}
-	
+
 	public float getX () {
 		return x;
 	}
@@ -149,13 +150,19 @@ public class Polyline {
 		this.originY = originY;
 		dirty = true;
 	}
-	
+
 	public void setPosition (float x, float y) {
 		this.x = x;
 		this.y = y;
 		dirty = true;
 	}
-	
+
+	public void setVertices (float[] vertices) {
+		if (vertices.length < 4) throw new IllegalArgumentException("polylines must contain at least 2 points.");
+		this.localVertices = vertices;
+		dirty = true;
+	}
+
 	public void setRotation (float degrees) {
 		this.rotation = degrees;
 		dirty = true;
@@ -183,11 +190,11 @@ public class Polyline {
 	public void calculateLength () {
 		calculateLength = true;
 	}
-	
+
 	public void calculateScaledLength () {
 		calculateScaledLength = true;
 	}
-	
+
 	public void dirty () {
 		dirty = true;
 	}
@@ -196,5 +203,45 @@ public class Polyline {
 		this.x += x;
 		this.y += y;
 		dirty = true;
+	}
+
+	/** Returns an axis-aligned bounding box of this polyline.
+	 *
+	 * Note the returned Rectangle is cached in this polyline, and will be reused if this Polyline is changed.
+	 *
+	 * @return this polyline's bounding box {@link Rectangle} */
+	public Rectangle getBoundingRectangle () {
+		float[] vertices = getTransformedVertices();
+
+		float minX = vertices[0];
+		float minY = vertices[1];
+		float maxX = vertices[0];
+		float maxY = vertices[1];
+
+		final int numFloats = vertices.length;
+		for (int i = 2; i < numFloats; i += 2) {
+			minX = minX > vertices[i] ? vertices[i] : minX;
+			minY = minY > vertices[i + 1] ? vertices[i + 1] : minY;
+			maxX = maxX < vertices[i] ? vertices[i] : maxX;
+			maxY = maxY < vertices[i + 1] ? vertices[i + 1] : maxY;
+		}
+
+		if (bounds == null) bounds = new Rectangle();
+		bounds.x = minX;
+		bounds.y = minY;
+		bounds.width = maxX - minX;
+		bounds.height = maxY - minY;
+
+		return bounds;
+	}
+
+	@Override
+	public boolean contains (Vector2 point) {
+		return false;
+	}
+
+	@Override
+	public boolean contains (float x, float y) {
+		return false;
 	}
 }

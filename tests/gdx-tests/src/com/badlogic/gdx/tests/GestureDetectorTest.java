@@ -18,7 +18,7 @@ package com.badlogic.gdx.tests;
 
 import com.badlogic.gdx.ApplicationListener;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.GL10;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -72,7 +72,7 @@ public class GestureDetectorTest extends GdxTest implements ApplicationListener 
 			camera.position.add(-deltaX * camera.zoom, deltaY * camera.zoom, 0);
 			return false;
 		}
-		
+
 		@Override
 		public boolean panStop (float x, float y, int pointer, int button) {
 			Gdx.app.log("GestureDetectorTest", "pan stop at " + x + ", " + y);
@@ -88,7 +88,8 @@ public class GestureDetectorTest extends GdxTest implements ApplicationListener 
 		}
 
 		@Override
-		public boolean pinch (Vector2 initialFirstPointer, Vector2 initialSecondPointer, Vector2 firstPointer, Vector2 secondPointer) {
+		public boolean pinch (Vector2 initialFirstPointer, Vector2 initialSecondPointer, Vector2 firstPointer,
+			Vector2 secondPointer) {
 			return false;
 		}
 
@@ -101,6 +102,10 @@ public class GestureDetectorTest extends GdxTest implements ApplicationListener 
 				if (Math.abs(velY) < 0.01f) velY = 0;
 			}
 		}
+
+		@Override
+		public void pinchStop () {
+		}
 	}
 
 	@Override
@@ -109,13 +114,13 @@ public class GestureDetectorTest extends GdxTest implements ApplicationListener 
 		batch = new SpriteBatch();
 		camera = new OrthographicCamera(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
 		controller = new CameraController();
-		gestureDetector = new GestureDetector(20, 0.5f, 2, 0.15f, controller);
+		gestureDetector = new GestureDetector(20, 40, 0.5f, 2, 0.15f, controller);
 		Gdx.input.setInputProcessor(gestureDetector);
 	}
 
 	@Override
 	public void render () {
-		Gdx.gl.glClear(GL10.GL_COLOR_BUFFER_BIT);
+		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 		controller.update();
 		camera.update();
 		batch.setProjectionMatrix(camera.combined);
@@ -128,9 +133,5 @@ public class GestureDetectorTest extends GdxTest implements ApplicationListener 
 	public void dispose () {
 		texture.dispose();
 		batch.dispose();
-	}
-
-	public boolean needsGL20 () {
-		return false;
 	}
 }

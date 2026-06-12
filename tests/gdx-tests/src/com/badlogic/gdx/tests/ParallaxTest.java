@@ -17,7 +17,6 @@
 package com.badlogic.gdx.tests;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.GL10;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -27,13 +26,9 @@ import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.tests.utils.GdxTest;
 import com.badlogic.gdx.tests.utils.OrthoCamController;
+import com.badlogic.gdx.utils.ScreenUtils;
 
 public class ParallaxTest extends GdxTest {
-	@Override
-	public boolean needsGL20 () {
-		return true;
-	}
-
 	class ParallaxCamera extends OrthographicCamera {
 		Matrix4 parallaxView = new Matrix4();
 		Matrix4 parallaxCombined = new Matrix4();
@@ -75,7 +70,7 @@ public class ParallaxTest extends GdxTest {
 		controller = new OrthoCamController(camera);
 		Gdx.input.setInputProcessor(controller);
 		batch = new SpriteBatch();
-		font = new BitmapFont(Gdx.files.internal("data/arial-15.fnt"), false);
+		font = new BitmapFont(Gdx.files.internal("data/lsans-15.fnt"), false);
 	}
 
 	@Override
@@ -87,8 +82,7 @@ public class ParallaxTest extends GdxTest {
 
 	@Override
 	public void render () {
-		Gdx.gl.glClearColor(242 / 255.0f, 210 / 255.0f, 111 / 255.0f, 1);
-		Gdx.gl.glClear(GL10.GL_COLOR_BUFFER_BIT);
+		ScreenUtils.clear(242 / 255.0f, 210 / 255.0f, 111 / 255.0f, 1);
 
 		// keep camera in foreground layer bounds
 		boolean updateCamera = false;

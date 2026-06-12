@@ -17,7 +17,8 @@
 package com.badlogic.gdx.tests;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.GL10;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.tests.utils.GdxTest;
@@ -34,9 +35,10 @@ public class ShapeRendererAlphaTest extends GdxTest {
 
 	@Override
 	public void render () {
-		Gdx.gl.glClear(GL10.GL_COLOR_BUFFER_BIT);
-		Gdx.gl.glEnable(GL10.GL_BLEND);
-		Gdx.gl.glBlendFunc(GL10.GL_SRC_ALPHA, GL10.GL_ONE_MINUS_SRC_ALPHA);
+		Gdx.gl.glClearColor(1, 1, 1, 1);
+		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+		Gdx.gl.glEnable(GL20.GL_BLEND);
+		Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
 		renderer.begin(ShapeType.Line);
 		renderer.setColor(1, 0, 0, 0.5f);
@@ -46,6 +48,11 @@ public class ShapeRendererAlphaTest extends GdxTest {
 		renderer.begin(ShapeType.Filled);
 		renderer.setColor(0, 1, 0, 0.5f);
 		renderer.rect(200, 0, 100, 100);
+		renderer.end();
+
+		renderer.begin(ShapeType.Filled);
+		renderer.setColor(new Color(0x000000ff));
+		renderer.rect(300, 0, 100, 100);
 		renderer.end();
 
 		renderer.begin(ShapeType.Line);

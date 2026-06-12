@@ -16,9 +16,9 @@
 
 package com.badlogic.gdx.utils;
 
-import com.badlogic.gdx.math.MathUtils;
-
 import java.util.Arrays;
+
+import com.badlogic.gdx.math.MathUtils;
 
 /** A resizable, ordered or unordered float array. Avoids the boxing that occurs with ArrayList<Float>. If unordered, this class
  * avoids a memory copy when removing elements (the last element is moved to the removed element's position).
@@ -78,8 +78,35 @@ public class FloatArray {
 		items[size++] = value;
 	}
 
+	public void add (float value1, float value2) {
+		float[] items = this.items;
+		if (size + 1 >= items.length) items = resize(Math.max(8, (int)(size * 1.75f)));
+		items[size] = value1;
+		items[size + 1] = value2;
+		size += 2;
+	}
+
+	public void add (float value1, float value2, float value3) {
+		float[] items = this.items;
+		if (size + 2 >= items.length) items = resize(Math.max(8, (int)(size * 1.75f)));
+		items[size] = value1;
+		items[size + 1] = value2;
+		items[size + 2] = value3;
+		size += 3;
+	}
+
+	public void add (float value1, float value2, float value3, float value4) {
+		float[] items = this.items;
+		if (size + 3 >= items.length) items = resize(Math.max(8, (int)(size * 1.8f))); // 1.75 isn't enough when size=5.
+		items[size] = value1;
+		items[size + 1] = value2;
+		items[size + 2] = value3;
+		items[size + 3] = value4;
+		size += 4;
+	}
+
 	public void addAll (FloatArray array) {
-		addAll(array, 0, array.size);
+		addAll(array.items, 0, array.size);
 	}
 
 	public void addAll (FloatArray array, int offset, int length) {
@@ -95,7 +122,7 @@ public class FloatArray {
 	public void addAll (float[] array, int offset, int length) {
 		float[] items = this.items;
 		int sizeNeeded = size + length;
-		if (sizeNeeded > items.length) items = resize(Math.max(8, (int)(sizeNeeded * 1.75f)));
+		if (sizeNeeded > items.length) items = resize(Math.max(Math.max(8, sizeNeeded), (int)(size * 1.75f)));
 		System.arraycopy(array, offset, items, size, length);
 		size += length;
 	}
@@ -115,9 +142,21 @@ public class FloatArray {
 		items[index] += value;
 	}
 
+	public void incr (float value) {
+		float[] items = this.items;
+		for (int i = 0, n = size; i < n; i++)
+			items[i] += value;
+	}
+
 	public void mul (int index, float value) {
 		if (index >= size) throw new IndexOutOfBoundsException("index can't be >= size: " + index + " >= " + size);
 		items[index] *= value;
+	}
+
+	public void mul (float value) {
+		float[] items = this.items;
+		for (int i = 0, n = size; i < n; i++)
+			items[i] *= value;
 	}
 
 	public void insert (int index, float value) {
@@ -132,6 +171,16 @@ public class FloatArray {
 		items[index] = value;
 	}
 
+	/** Inserts the specified number of items at the specified index. The new items will have values equal to the values at those
+	 * indices before the insertion. */
+	public void insertRange (int index, int count) {
+		if (index > size) throw new IndexOutOfBoundsException("index can't be > size: " + index + " > " + size);
+		int sizeNeeded = size + count;
+		if (sizeNeeded > items.length) items = resize(Math.max(Math.max(8, sizeNeeded), (int)(size * 1.75f)));
+		System.arraycopy(items, index, items, index + count, size - index);
+		size = sizeNeeded;
+	}
+
 	public void swap (int first, int second) {
 		if (first >= size) throw new IndexOutOfBoundsException("first can't be >= size: " + first + " >= " + size);
 		if (second >= size) throw new IndexOutOfBoundsException("second can't be >= size: " + second + " >= " + size);
@@ -139,6 +188,37 @@ public class FloatArray {
 		float firstValue = items[first];
 		items[first] = items[second];
 		items[second] = firstValue;
+	}
+
+	/** Returns true if the specified value was replaced successfully with the replacement
+	 * @param value the float to be replaced
+	 * @param replacement the first value will be replaced by this replacement if found
+	 * @return if value was found and replaced */
+	public boolean replaceFirst (float value, float replacement) {
+		float[] items = this.items;
+		for (int i = 0, n = size; i < n; i++) {
+			if (items[i] == value) {
+				items[i] = replacement;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Returns the number of replacements done.
+	 * @param value the float to be replaced
+	 * @param replacement all occurrences of value will be replaced by this replacement
+	 * @return the number of replacements done */
+	public int replaceAll (float value, float replacement) {
+		float[] items = this.items;
+		int replacements = 0;
+		for (int i = 0, n = size; i < n; i++) {
+			if (items[i] == value) {
+				items[i] = replacement;
+				replacements++;
+			}
+		}
+		return replacements;
 	}
 
 	public boolean contains (float value) {
@@ -156,7 +236,7 @@ public class FloatArray {
 		return -1;
 	}
 
-	public int lastIndexOf (char value) {
+	public int lastIndexOf (float value) {
 		float[] items = this.items;
 		for (int i = size - 1; i >= 0; i--)
 			if (items[i] == value) return i;
@@ -187,7 +267,22 @@ public class FloatArray {
 		return value;
 	}
 
-	/** Removes from this array all of elements contained in the specified array.
+	/** Removes the items between the specified indices, inclusive. */
+	public void removeRange (int start, int end) {
+		int n = size;
+		if (end >= n) throw new IndexOutOfBoundsException("end can't be >= size: " + end + " >= " + size);
+		if (start > end) throw new IndexOutOfBoundsException("start can't be > end: " + start + " > " + end);
+		int count = end - start + 1, lastIndex = n - count;
+		if (ordered)
+			System.arraycopy(items, start + count, items, start, n - (start + count));
+		else {
+			int i = Math.max(lastIndex, end + 1);
+			System.arraycopy(items, i, items, start, n - i);
+		}
+		size = n - count;
+	}
+
+	/** Removes from this array the first instance of each element contained in the specified array.
 	 * @return true if this array was modified. */
 	public boolean removeAll (FloatArray array) {
 		int size = this.size;
@@ -222,23 +317,44 @@ public class FloatArray {
 		return items[0];
 	}
 
+	/** Returns true if the array has one or more items. */
+	public boolean notEmpty () {
+		return size > 0;
+	}
+
+	/** Returns true if the array is empty. */
+	public boolean isEmpty () {
+		return size == 0;
+	}
+
 	public void clear () {
 		size = 0;
 	}
 
-	/** Reduces the size of the backing array to the size of the actual items. This is useful to release memory when many items have
-	 * been removed, or if it is known that more items will not be added. */
-	public void shrink () {
-		if (items.length == size) return;
-		resize(size);
+	/** Reduces the size of the backing array to the size of the actual items. This is useful to release memory when many items
+	 * have been removed, or if it is known that more items will not be added.
+	 * @return {@link #items} */
+	public float[] shrink () {
+		if (items.length != size) resize(size);
+		return items;
 	}
 
-	/** Increases the size of the backing array to acommodate the specified number of additional items. Useful before adding many
+	/** Increases the size of the backing array to accommodate the specified number of additional items. Useful before adding many
 	 * items to avoid multiple backing array resizes.
 	 * @return {@link #items} */
 	public float[] ensureCapacity (int additionalCapacity) {
+		if (additionalCapacity < 0) throw new IllegalArgumentException("additionalCapacity must be >= 0: " + additionalCapacity);
 		int sizeNeeded = size + additionalCapacity;
-		if (sizeNeeded > items.length) resize(Math.max(8, sizeNeeded));
+		if (sizeNeeded > items.length) resize(Math.max(Math.max(8, sizeNeeded), (int)(size * 1.75f)));
+		return items;
+	}
+
+	/** Sets the array size, leaving any values beyond the current size undefined.
+	 * @return {@link #items} */
+	public float[] setSize (int newSize) {
+		if (newSize < 0) throw new IllegalArgumentException("newSize must be >= 0: " + newSize);
+		if (newSize > items.length) resize(Math.max(8, newSize));
+		size = newSize;
 		return items;
 	}
 
@@ -277,6 +393,7 @@ public class FloatArray {
 	/** Reduces the size of the array to the specified size. If the array is already smaller than the specified size, no action is
 	 * taken. */
 	public void truncate (int newSize) {
+		if (newSize < 0) throw new IllegalArgumentException("newSize must be >= 0: " + newSize);
 		if (size > newSize) size = newSize;
 	}
 
@@ -292,29 +409,42 @@ public class FloatArray {
 		return array;
 	}
 
+	public int hashCode () {
+		if (!ordered) return super.hashCode();
+		float[] items = this.items;
+		int h = 1;
+		for (int i = 0, n = size; i < n; i++)
+			h = h * 31 + NumberUtils.floatToRawIntBits(items[i]);
+		return h;
+	}
+
+	/** Returns false if either array is unordered. */
 	public boolean equals (Object object) {
 		if (object == this) return true;
+		if (!ordered) return false;
 		if (!(object instanceof FloatArray)) return false;
 		FloatArray array = (FloatArray)object;
+		if (!array.ordered) return false;
 		int n = size;
 		if (n != array.size) return false;
-		float[] items = this.items;
-		float[] arrayItems = array.items;
+		float[] items1 = this.items, items2 = array.items;
 		for (int i = 0; i < n; i++)
-			if (items[i] != arrayItems[i]) return false;
+			if (items1[i] != items2[i]) return false;
 		return true;
 	}
 
+	/** Returns false if either array is unordered. */
 	public boolean equals (Object object, float epsilon) {
 		if (object == this) return true;
 		if (!(object instanceof FloatArray)) return false;
 		FloatArray array = (FloatArray)object;
 		int n = size;
 		if (n != array.size) return false;
-		float[] items = this.items;
-		float[] arrayItems = array.items;
+		if (!ordered) return false;
+		if (!array.ordered) return false;
+		float[] items1 = this.items, items2 = array.items;
 		for (int i = 0; i < n; i++)
-			if (Math.abs(items[i] - arrayItems[i]) > epsilon) return false;
+			if (Math.abs(items1[i] - items2[i]) > epsilon) return false;
 		return true;
 	}
 

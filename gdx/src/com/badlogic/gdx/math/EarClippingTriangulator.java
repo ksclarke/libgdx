@@ -24,12 +24,16 @@ import com.badlogic.gdx.utils.ShortArray;
  * <ul>
  * <li><a href="http://cgm.cs.mcgill.ca/~godfried/teaching/cg-projects/97/Ian/algorithm2.html">http://cgm.cs.mcgill.ca/~godfried/
  * teaching/cg-projects/97/Ian/algorithm2.html</a></li>
- * <li><a
- * href="http://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf">http://www.geometrictools.com/Documentation
+ * <li><a href=
+ * "http://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf">http://www.geometrictools.com/Documentation
  * /TriangulationByEarClipping.pdf</a></li>
  * </ul>
  * If the input polygon is not simple (self-intersects), there will be output but it is of unspecified quality (garbage in,
  * garbage out).
+ * <p>
+ * If the polygon vertices are very large or very close together then {@link GeometryUtils#isClockwise(float[], int, int)} may not
+ * be able to properly assess the winding (because it uses floats). In that case the vertices should be adjusted, eg by finding
+ * the smallest X and Y values and subtracting that from each vertex.
  * @author badlogicgames@gmail.com
  * @author Nicolas Gramlich (optimizations, collinear edge support)
  * @author Eric Spitz
@@ -37,7 +41,6 @@ import com.badlogic.gdx.utils.ShortArray;
  * @author Nathan Sweet (rewrite, return indices, no allocation, optimizations) */
 public class EarClippingTriangulator {
 	static private final int CONCAVE = -1;
-	static private final int TANGENTIAL = 0;
 	static private final int CONVEX = 1;
 
 	private final ShortArray indicesArray = new ShortArray();
@@ -64,18 +67,19 @@ public class EarClippingTriangulator {
 	public ShortArray computeTriangles (float[] vertices, int offset, int count) {
 		this.vertices = vertices;
 		int vertexCount = this.vertexCount = count / 2;
+		int vertexOffset = offset / 2;
 
 		ShortArray indicesArray = this.indicesArray;
 		indicesArray.clear();
 		indicesArray.ensureCapacity(vertexCount);
 		indicesArray.size = vertexCount;
 		short[] indices = this.indices = indicesArray.items;
-		if (areVerticesClockwise(vertices, offset, count)) {
+		if (GeometryUtils.isClockwise(vertices, offset, count)) {
 			for (short i = 0; i < vertexCount; i++)
-				indices[i] = i;
+				indices[i] = (short)(vertexOffset + i);
 		} else {
 			for (int i = 0, n = vertexCount - 1; i < vertexCount; i++)
-				indices[i] = (short)(n - i); // Reversed.
+				indices[i] = (short)(vertexOffset + n - i); // Reversed.
 		}
 
 		IntArray vertexTypes = this.vertexTypes;
@@ -115,7 +119,7 @@ public class EarClippingTriangulator {
 		}
 	}
 
-	/** @return {@link #CONCAVE}, {@link #TANGENTIAL} or {@link #CONVEX} */
+	/** @return {@link #CONCAVE} or {@link #CONVEX} */
 	private int classifyVertex (int index) {
 		short[] indices = this.indices;
 		int previous = indices[previousIndex(index)] * 2;
@@ -170,9 +174,10 @@ public class EarClippingTriangulator {
 				float vy = vertices[v + 1];
 				// Because the polygon has clockwise winding order, the area sign will be positive if the point is strictly inside.
 				// It will be 0 on the edge, which we want to include as well.
-				if (computeSpannedAreaSign(p1x, p1y, p2x, p2y, vx, vy) >= 0) {
-					if (computeSpannedAreaSign(p2x, p2y, p3x, p3y, vx, vy) >= 0) {
-						if (computeSpannedAreaSign(p3x, p3y, p1x, p1y, vx, vy) >= 0) return false;
+				// note: check the edge defined by p1->p3 first since this fails _far_ more then the other 2 checks.
+				if (computeSpannedAreaSign(p3x, p3y, p1x, p1y, vx, vy) >= 0) {
+					if (computeSpannedAreaSign(p1x, p1y, p2x, p2y, vx, vy) >= 0) {
+						if (computeSpannedAreaSign(p2x, p2y, p3x, p3y, vx, vy) >= 0) return false;
 					}
 				}
 			}
@@ -199,23 +204,6 @@ public class EarClippingTriangulator {
 
 	private int nextIndex (int index) {
 		return (index + 1) % vertexCount;
-	}
-
-	static private boolean areVerticesClockwise (float[] vertices, int offset, int count) {
-		if (count <= 2) return false;
-		float area = 0, p1x, p1y, p2x, p2y;
-		for (int i = offset, n = offset + count - 3; i < n; i += 2) {
-			p1x = vertices[i];
-			p1y = vertices[i + 1];
-			p2x = vertices[i + 2];
-			p2y = vertices[i + 3];
-			area += p1x * p2y - p2x * p1y;
-		}
-		p1x = vertices[count - 2];
-		p1y = vertices[count - 1];
-		p2x = vertices[0];
-		p2y = vertices[1];
-		return area + p1x * p2y - p2x * p1y < 0;
 	}
 
 	static private int computeSpannedAreaSign (float p1x, float p1y, float p2x, float p2y, float p3x, float p3y) {

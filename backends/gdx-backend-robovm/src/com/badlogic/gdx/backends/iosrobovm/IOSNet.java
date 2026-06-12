@@ -16,35 +16,47 @@
 
 package com.badlogic.gdx.backends.iosrobovm;
 
-import org.robovm.cocoatouch.foundation.NSURL;
-import org.robovm.cocoatouch.uikit.UIApplication;
+import org.robovm.apple.foundation.NSURL;
+import org.robovm.apple.uikit.UIApplication;
 
 import com.badlogic.gdx.Net;
 import com.badlogic.gdx.net.NetJavaImpl;
+import com.badlogic.gdx.net.NetJavaServerSocketImpl;
+import com.badlogic.gdx.net.NetJavaSocketImpl;
 import com.badlogic.gdx.net.ServerSocket;
 import com.badlogic.gdx.net.ServerSocketHints;
 import com.badlogic.gdx.net.Socket;
 import com.badlogic.gdx.net.SocketHints;
-import com.badlogic.gdx.net.NetJavaSocketImpl;
-import com.badlogic.gdx.net.NetJavaServerSocketImpl;
+import org.robovm.apple.uikit.UIApplicationOpenURLOptions;
 
 public class IOSNet implements Net {
 
-	NetJavaImpl netJavaImpl = new NetJavaImpl();
+	NetJavaImpl netJavaImpl;
 	final UIApplication uiApp;
 
-	public IOSNet (IOSApplication app) {
+	public IOSNet (IOSApplication app, IOSApplicationConfiguration configuration) {
 		uiApp = app.uiApp;
+		netJavaImpl = new NetJavaImpl(configuration.maxNetThreads);
 	}
 
 	@Override
 	public void sendHttpRequest (HttpRequest httpRequest, HttpResponseListener httpResponseListener) {
 		netJavaImpl.sendHttpRequest(httpRequest, httpResponseListener);
 	}
-	
+
 	@Override
 	public void cancelHttpRequest (HttpRequest httpRequest) {
 		netJavaImpl.cancelHttpRequest(httpRequest);
+	}
+
+	@Override
+	public boolean isHttpRequestPending (HttpRequest httpRequest) {
+		return netJavaImpl.isHttpRequestPending(httpRequest);
+	}
+
+	@Override
+	public ServerSocket newServerSocket (Protocol protocol, String hostname, int port, ServerSocketHints hints) {
+		return new NetJavaServerSocketImpl(protocol, hostname, port, hints);
 	}
 
 	@Override
@@ -58,7 +70,12 @@ public class IOSNet implements Net {
 	}
 
 	@Override
-	public void openURI (String URI) {
-		uiApp.openURL(new NSURL(URI));
+	public boolean openURI (String URI) {
+		NSURL url = new NSURL(URI);
+		if (uiApp.canOpenURL(url)) {
+			uiApp.openURL(url, new UIApplicationOpenURLOptions(), null);
+			return true;
+		}
+		return false;
 	}
 }

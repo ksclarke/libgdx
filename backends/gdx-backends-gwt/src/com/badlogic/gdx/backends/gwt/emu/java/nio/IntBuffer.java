@@ -57,7 +57,8 @@ public abstract class IntBuffer extends Buffer implements Comparable<IntBuffer> 
 
 	/** Creates a new int buffer by wrapping the given int array.
 	 * <p>
-	 * The new buffer's position will be {@code start}, limit will be {@code start + len}, capacity will be the length of the array.
+	 * The new buffer's position will be {@code start}, limit will be {@code start + len}, capacity will be the length of the
+	 * array.
 	 * </p>
 	 * 
 	 * @param array the int array which the new buffer will be based on.
@@ -179,8 +180,8 @@ public abstract class IntBuffer extends Buffer implements Comparable<IntBuffer> 
 
 	/** Checks whether this int buffer is equal to another object.
 	 * <p>
-	 * If {@code other} is not a int buffer then {@code false} is returned. Two int buffers are equal if and only if their remaining
-	 * ints are exactly the same. Position, limit, capacity and mark are not considered.
+	 * If {@code other} is not a int buffer then {@code false} is returned. Two int buffers are equal if and only if their
+	 * remaining ints are exactly the same. Position, limit, capacity and mark are not considered.
 	 * </p>
 	 * 
 	 * @param other the object to compare with this int buffer.
@@ -337,8 +338,8 @@ public abstract class IntBuffer extends Buffer implements Comparable<IntBuffer> 
 		return put(src, 0, src.length);
 	}
 
-	/** Writes ints from the given int array, starting from the specified offset, to the current position and increases the position
-	 * by the number of ints written.
+	/** Writes ints from the given int array, starting from the specified offset, to the current position and increases the
+	 * position by the number of ints written.
 	 * 
 	 * @param src the source int array.
 	 * @param off the offset of int array, must not be negative and not greater than {@code src.length}.
@@ -415,14 +416,14 @@ public abstract class IntBuffer extends Buffer implements Comparable<IntBuffer> 
 	 * @return a string represents of the state of this int buffer.
 	 * @since Android 1.0 */
 	public String toString () {
-		StringBuffer buf = new StringBuffer();
-		buf.append(getClass().getName());
-		buf.append(", status: capacity="); //$NON-NLS-1$
-		buf.append(capacity());
-		buf.append(" position="); //$NON-NLS-1$
-		buf.append(position());
-		buf.append(" limit="); //$NON-NLS-1$
-		buf.append(limit());
-		return buf.toString();
+		StringBuilder sb = new StringBuilder();
+		sb.append(getClass().getName());
+		sb.append(", status: capacity="); //$NON-NLS-1$
+		sb.append(capacity());
+		sb.append(" position="); //$NON-NLS-1$
+		sb.append(position());
+		sb.append(" limit="); //$NON-NLS-1$
+		sb.append(limit());
+		return sb.toString();
 	}
 }

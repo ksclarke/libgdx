@@ -19,167 +19,228 @@ package com.badlogic.gdx.backends.headless.mock.input;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.InputProcessor;
-import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.input.NativeInputConfiguration;
 
-/** The headless backend does its best to mock elements. This is intended to make code-sharing between
- * server and client as simple as possible.
- */
+/** The headless backend does its best to mock elements. This is intended to make code-sharing between server and client as simple
+ * as possible. */
 public class MockInput implements Input {
 
 	@Override
-	public float getAccelerometerX() {
+	public float getAccelerometerX () {
 		return 0;
 	}
 
 	@Override
-	public float getAccelerometerY() {
+	public float getAccelerometerY () {
 		return 0;
 	}
 
 	@Override
-	public float getAccelerometerZ() {
+	public float getAccelerometerZ () {
 		return 0;
 	}
 
 	@Override
-	public int getX() {
+	public float getGyroscopeX () {
 		return 0;
 	}
 
 	@Override
-	public int getX(int pointer) {
+	public float getGyroscopeY () {
 		return 0;
 	}
 
 	@Override
-	public int getDeltaX() {
+	public float getGyroscopeZ () {
 		return 0;
 	}
 
 	@Override
-	public int getDeltaX(int pointer) {
+	public int getMaxPointers () {
 		return 0;
 	}
 
 	@Override
-	public int getY() {
+	public int getX () {
 		return 0;
 	}
 
 	@Override
-	public int getY(int pointer) {
+	public int getX (int pointer) {
 		return 0;
 	}
 
 	@Override
-	public int getDeltaY() {
+	public int getDeltaX () {
 		return 0;
 	}
 
 	@Override
-	public int getDeltaY(int pointer) {
+	public int getDeltaX (int pointer) {
 		return 0;
 	}
 
 	@Override
-	public boolean isTouched() {
+	public int getY () {
+		return 0;
+	}
+
+	@Override
+	public int getY (int pointer) {
+		return 0;
+	}
+
+	@Override
+	public int getDeltaY () {
+		return 0;
+	}
+
+	@Override
+	public int getDeltaY (int pointer) {
+		return 0;
+	}
+
+	@Override
+	public boolean isTouched () {
 		return false;
 	}
 
 	@Override
-	public boolean justTouched() {
+	public boolean justTouched () {
 		return false;
 	}
 
 	@Override
-	public boolean isTouched(int pointer) {
+	public boolean isTouched (int pointer) {
 		return false;
 	}
 
 	@Override
-	public boolean isButtonPressed(int button) {
+	public float getPressure () {
+		return 0;
+	}
+
+	@Override
+	public float getPressure (int pointer) {
+		return 0;
+	}
+
+	@Override
+	public boolean isButtonPressed (int button) {
 		return false;
 	}
 
 	@Override
-	public boolean isKeyPressed(int key) {
+	public boolean isButtonJustPressed (int button) {
 		return false;
 	}
 
 	@Override
-	public void getTextInput(TextInputListener listener, String title, String text) {
+	public boolean isKeyPressed (int key) {
+		return false;
+	}
+
+	@Override
+	public boolean isKeyJustPressed (int key) {
+		return false;
+	}
+
+	@Override
+	public void getTextInput (TextInputListener listener, String title, String text, String hint) {
 
 	}
 
 	@Override
-	public void getPlaceholderTextInput(TextInputListener listener, String title, String placeholder) {
+	public void getTextInput (TextInputListener listener, String title, String text, String hint, OnscreenKeyboardType type) {
 
 	}
 
 	@Override
-	public void setOnscreenKeyboardVisible(boolean visible) {
+	public void setOnscreenKeyboardVisible (boolean visible) {
 
 	}
 
 	@Override
-	public void vibrate(int milliseconds) {
+	public void setOnscreenKeyboardVisible (boolean visible, OnscreenKeyboardType type) {
 
 	}
 
 	@Override
-	public void vibrate(long[] pattern, int repeat) {
+	public void openTextInputField (NativeInputConfiguration configuration) {
 
 	}
 
 	@Override
-	public void cancelVibrate() {
+	public void closeTextInputField (boolean sendReturn) {
 
 	}
 
 	@Override
-	public float getAzimuth() {
+	public void setKeyboardHeightObserver (KeyboardHeightObserver observer) {
+
+	}
+
+	@Override
+	public void vibrate (int milliseconds) {
+
+	}
+
+	@Override
+	public void vibrate (int milliseconds, boolean fallback) {
+	}
+
+	@Override
+	public void vibrate (int milliseconds, int amplitude, boolean fallback) {
+	}
+
+	@Override
+	public void vibrate (VibrationType vibrationType) {
+	}
+
+	@Override
+	public float getAzimuth () {
 		return 0;
 	}
 
 	@Override
-	public float getPitch() {
+	public float getPitch () {
 		return 0;
 	}
 
 	@Override
-	public float getRoll() {
+	public float getRoll () {
 		return 0;
 	}
 
 	@Override
-	public void getRotationMatrix(float[] matrix) {
+	public void getRotationMatrix (float[] matrix) {
 
 	}
 
 	@Override
-	public long getCurrentEventTime() {
+	public long getCurrentEventTime () {
 		return 0;
 	}
 
 	@Override
-	public void setCatchBackKey(boolean catchBack) {
+	public void setCatchKey (int keycode, boolean catchKey) {
 
 	}
 
 	@Override
-	public void setCatchMenuKey(boolean catchMenu) {
-
+	public boolean isCatchKey (int keycode) {
+		return false;
 	}
 
 	@Override
-	public void setInputProcessor(InputProcessor processor) {
+	public void setInputProcessor (InputProcessor processor) {
 
 	}
 
 	private InputProcessor mockInputProcessor;
 
 	@Override
-	public InputProcessor getInputProcessor() {
+	public InputProcessor getInputProcessor () {
 		if (mockInputProcessor == null) {
 			mockInputProcessor = new InputAdapter();
 		}
@@ -187,37 +248,32 @@ public class MockInput implements Input {
 	}
 
 	@Override
-	public boolean isPeripheralAvailable(Peripheral peripheral) {
+	public boolean isPeripheralAvailable (Peripheral peripheral) {
 		return false;
 	}
 
 	@Override
-	public int getRotation() {
+	public int getRotation () {
 		return 0;
 	}
 
 	@Override
-	public Orientation getNativeOrientation() {
+	public Orientation getNativeOrientation () {
 		return Orientation.Landscape;
 	}
 
 	@Override
-	public void setCursorCatched(boolean catched) {
+	public void setCursorCatched (boolean catched) {
 
 	}
 
 	@Override
-	public boolean isCursorCatched() {
+	public boolean isCursorCatched () {
 		return false;
 	}
 
 	@Override
-	public void setCursorPosition(int x, int y) {
-
-	}
-
-	@Override
-	public void setCursorImage(Pixmap pixmap, int xHotspot, int yHotspot) {
+	public void setCursorPosition (int x, int y) {
 
 	}
 }

@@ -23,168 +23,170 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.graphics.Camera;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.scenes.scene2d.InputEvent.Type;
+import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.scenes.scene2d.ui.Table.Debug;
+import com.badlogic.gdx.scenes.scene2d.utils.FocusListener;
 import com.badlogic.gdx.scenes.scene2d.utils.FocusListener.FocusEvent;
 import com.badlogic.gdx.scenes.scene2d.utils.ScissorStack;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Disposable;
+import com.badlogic.gdx.utils.Null;
 import com.badlogic.gdx.utils.Pool.Poolable;
-import com.badlogic.gdx.utils.Pools;
+import com.badlogic.gdx.utils.PoolManager;
+import com.badlogic.gdx.utils.Scaling;
 import com.badlogic.gdx.utils.SnapshotArray;
+import com.badlogic.gdx.utils.viewport.ScalingViewport;
+import com.badlogic.gdx.utils.viewport.Viewport;
 
 /** A 2D scene graph containing hierarchies of {@link Actor actors}. Stage handles the viewport and distributes input events.
  * <p>
- * A stage fills the whole screen. {@link #setViewport} controls the coordinates used within the stage and sets up the camera used
- * to convert between stage coordinates and screen coordinates.
+ * {@link #setViewport(Viewport)} controls the coordinates used within the stage and sets up the camera used to convert between
+ * stage coordinates and screen coordinates.
  * <p>
  * A stage must receive input events so it can distribute them to actors. This is typically done by passing the stage to
- * {@link Input#setInputProcessor(com.badlogic.gdx.InputProcessor) Gdx.input.setInputProcessor}. An {@link InputMultiplexer} may be
- * used to handle input events before or after the stage does. If an actor handles an event by returning true from the input
+ * {@link Input#setInputProcessor(com.badlogic.gdx.InputProcessor) Gdx.input.setInputProcessor}. An {@link InputMultiplexer} may
+ * be used to handle input events before or after the stage does. If an actor handles an event by returning true from the input
  * method, then the stage's input method will also return true, causing subsequent InputProcessors to not receive the event.
  * <p>
  * The Stage and its constituents (like Actors and Listeners) are not thread-safe and should only be updated and queried from a
  * single thread (presumably the main render thread). Methods should be reentrant, so you can update Actors and Stages from within
  * callbacks and handlers.
- * 
  * @author mzechner
  * @author Nathan Sweet */
 public class Stage extends InputAdapter implements Disposable {
-	static private final Vector2 actorCoords = new Vector2();
-	static private final Vector3 cameraCoords = new Vector3();
+	/** True if any actor has ever had debug enabled. */
+	static boolean debug;
 
-	private float viewportX, viewportY, viewportWidth, viewportHeight;
-	private float width, height;
-	private float gutterWidth, gutterHeight;
-	private Camera camera;
+	protected PoolManager pools = new PoolManager();
+	private Viewport viewport;
 	private final Batch batch;
-	private final boolean ownsBatch;
-	private final Group root;
-	private final Vector2 stageCoords = new Vector2();
+	private boolean ownsBatch;
+	private Group root;
+	private final Vector2 tempCoords = new Vector2();
 	private final Actor[] pointerOverActors = new Actor[20];
 	private final boolean[] pointerTouched = new boolean[20];
-	private final int[] pointerScreenX = new int[20];
-	private final int[] pointerScreenY = new int[20];
+	private final int[] pointerScreenX = new int[20], pointerScreenY = new int[20];
 	private int mouseScreenX, mouseScreenY;
-	private Actor mouseOverActor;
-	private Actor keyboardFocus, scrollFocus;
-	private final SnapshotArray<TouchFocus> touchFocuses = new SnapshotArray(true, 4, TouchFocus.class);
+	private @Null Actor mouseOverActor;
+	private @Null Actor keyboardFocus, scrollFocus;
+	final SnapshotArray<TouchFocus> touchFocuses = new SnapshotArray<>(true, 4, TouchFocus[]::new);
+	private boolean actionsRequestRendering = true;
 
-	/** Creates a stage with a {@link #setViewport(float, float, boolean) viewport} equal to the device screen resolution. The stage
-	 * will use its own {@link Batch}. */
+	private ShapeRenderer debugShapes;
+	private boolean debugInvisible, debugAll, debugUnderMouse, debugParentUnderMouse;
+	private Debug debugTableUnderMouse = Debug.none;
+	private final Color debugColor = new Color(0, 1, 0, 0.85f);
+
+	/** Creates a stage with a {@link ScalingViewport} set to {@link Scaling#stretch}. The stage will use its own {@link Batch}
+	 * which will be disposed when the stage is disposed. */
 	public Stage () {
-		this(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), false, null);
+		this(new ScalingViewport(Scaling.stretch, Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), new OrthographicCamera()),
+			new SpriteBatch());
+		ownsBatch = true;
 	}
 
-	/** Creates a stage with the specified {@link #setViewport(float, float, boolean) viewport} that doesn't keep the aspect ratio.
-	 * The stage will use its own {@link Batch}, which will be disposed when the stage is disposed. */
-	public Stage (float width, float height) {
-		this(width, height, false, null);
+	/** Creates a stage with the specified viewport. The stage will use its own {@link Batch} which will be disposed when the stage
+	 * is disposed. */
+	public Stage (Viewport viewport) {
+		this(viewport, new SpriteBatch());
+		ownsBatch = true;
 	}
 
-	/** Creates a stage with the specified {@link #setViewport(float, float, boolean) viewport}. The stage will use its own
-	 * {@link Batch}, which will be disposed when the stage is disposed. */
-	public Stage (float width, float height, boolean keepAspectRatio) {
-		this(width, height, keepAspectRatio, null);
-	}
+	/** Creates a stage with the specified viewport and batch. This can be used to specify an existing batch or to customize which
+	 * batch implementation is used.
+	 * @param batch Will not be disposed if {@link #dispose()} is called, handle disposal yourself. */
+	public Stage (Viewport viewport, Batch batch) {
+		if (viewport == null) throw new IllegalArgumentException("viewport cannot be null.");
+		if (batch == null) throw new IllegalArgumentException("batch cannot be null.");
+		this.viewport = viewport;
+		this.batch = batch;
 
-	/** Creates a stage with the specified {@link #setViewport(float, float, boolean) viewport} and {@link Batch}. This can be used
-	 * to avoid creating a new Batch (which can be somewhat slow) if multiple stages are used during an applications life time.
-	 * @param batch Will not be disposed if {@link #dispose()} is called. Handle disposal yourself. */
-	public Stage (float width, float height, boolean keepAspectRatio, Batch batch) {
-		ownsBatch = batch == null;
-		this.batch = ownsBatch ? new SpriteBatch() : batch;
-
-		this.width = width;
-		this.height = height;
+		this.pools.addPool(InputEvent.class, InputEvent::new);
+		this.pools.addPool(FocusEvent.class, FocusEvent::new);
+		this.pools.addPool(TouchFocus.class, TouchFocus::new);
 
 		root = new Group();
 		root.setStage(this);
 
-		camera = new OrthographicCamera();
-		setViewport(width, height, keepAspectRatio);
-	}
-
-	/** Sets up the stage size using a viewport that fills the entire screen without keeping the aspect ratio.
-	 * @see #setViewport(float, float, boolean, float, float, float, float) */
-	public void setViewport (float width, float height) {
-		setViewport(width, height, false, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-	}
-
-	/** Sets up the stage size using a viewport that fills the entire screen.
-	 * @see #setViewport(float, float, boolean, float, float, float, float) */
-	public void setViewport (float width, float height, boolean keepAspectRatio) {
-		setViewport(width, height, keepAspectRatio, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-	}
-
-	/** Sets up the stage size and viewport. The viewport is the glViewport position and size, which is the portion of the screen
-	 * used by the stage. The stage size determines the units used within the stage, depending on keepAspectRatio:
-	 * <p>
-	 * If keepAspectRatio is false, the stage is stretched to fill the viewport, which may distort the aspect ratio.
-	 * <p>
-	 * If keepAspectRatio is true, the stage is first scaled to fit the viewport in the longest dimension. Next the shorter
-	 * dimension is lengthened to fill the viewport, which keeps the aspect ratio from changing. The {@link #getGutterWidth()} and
-	 * {@link #getGutterHeight()} provide access to the amount that was lengthened.
-	 * @param viewportX The bottom left corner of the viewport in glViewport coordinates.
-	 * @param viewportY The bottom left corner of the viewport in glViewport coordinates.
-	 * @param viewportWidth The width of the viewport in pixels.
-	 * @param viewportHeight The height of the viewport in pixels. */
-	public void setViewport (float stageWidth, float stageHeight, boolean keepAspectRatio, float viewportX, float viewportY,
-		float viewportWidth, float viewportHeight) {
-		this.viewportX = viewportX;
-		this.viewportY = viewportY;
-		this.viewportWidth = viewportWidth;
-		this.viewportHeight = viewportHeight;
-		if (keepAspectRatio) {
-			if (viewportHeight / viewportWidth < stageHeight / stageWidth) {
-				float toViewportSpace = viewportHeight / stageHeight;
-				float toStageSpace = stageHeight / viewportHeight;
-				float deviceWidth = stageWidth * toViewportSpace;
-				float lengthen = (viewportWidth - deviceWidth) * toStageSpace;
-				this.width = stageWidth + lengthen;
-				this.height = stageHeight;
-				gutterWidth = lengthen / 2;
-				gutterHeight = 0;
-			} else {
-				float toViewportSpace = viewportWidth / stageWidth;
-				float toStageSpace = stageWidth / viewportWidth;
-				float deviceHeight = stageHeight * toViewportSpace;
-				float lengthen = (viewportHeight - deviceHeight) * toStageSpace;
-				this.height = stageHeight + lengthen;
-				this.width = stageWidth;
-				gutterWidth = 0;
-				gutterHeight = lengthen / 2;
-			}
-		} else {
-			this.width = stageWidth;
-			this.height = stageHeight;
-			gutterWidth = 0;
-			gutterHeight = 0;
-		}
-
-		float centerX = this.width / 2;
-		float centerY = this.height / 2;
-		camera.position.set(centerX, centerY, 0);
-		camera.viewportWidth = this.width;
-		camera.viewportHeight = this.height;
+		viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
 	}
 
 	public void draw () {
+		Camera camera = viewport.getCamera();
 		camera.update();
+
 		if (!root.isVisible()) return;
+
+		Batch batch = this.batch;
 		batch.setProjectionMatrix(camera.combined);
 		batch.begin();
 		root.draw(batch, 1);
 		batch.end();
+
+		if (debug) drawDebug();
 	}
 
-	/** Calls {@link #act(float)} with {@link Graphics#getDeltaTime()}. */
+	private void drawDebug () {
+		if (debugShapes == null) {
+			debugShapes = new ShapeRenderer();
+			debugShapes.setAutoShapeType(true);
+		}
+
+		if (debugUnderMouse || debugParentUnderMouse || debugTableUnderMouse != Debug.none) {
+			screenToStageCoordinates(tempCoords.set(Gdx.input.getX(), Gdx.input.getY()));
+			Actor actor = hit(tempCoords.x, tempCoords.y, true);
+			if (actor == null) return;
+
+			if (debugParentUnderMouse && actor.parent != null) actor = actor.parent;
+
+			if (debugTableUnderMouse == Debug.none)
+				actor.setDebug(true);
+			else {
+				while (actor != null) {
+					if (actor instanceof Table) break;
+					actor = actor.parent;
+				}
+				if (actor == null) return;
+				((Table)actor).debug(debugTableUnderMouse);
+			}
+
+			if (debugAll && actor instanceof Group) ((Group)actor).debugAll();
+
+			disableDebug(root, actor);
+		} else {
+			if (debugAll) root.debugAll();
+		}
+
+		Gdx.gl.glEnable(GL20.GL_BLEND);
+		debugShapes.setProjectionMatrix(viewport.getCamera().combined);
+		debugShapes.begin();
+		root.drawDebug(debugShapes);
+		debugShapes.end();
+		Gdx.gl.glDisable(GL20.GL_BLEND);
+	}
+
+	/** Disables debug on all actors recursively except the specified actor and any children. */
+	private void disableDebug (Actor actor, Actor except) {
+		if (actor == except) return;
+		actor.setDebug(false);
+		if (actor instanceof Group) {
+			SnapshotArray<Actor> children = ((Group)actor).children;
+			for (int i = 0, n = children.size; i < n; i++)
+				disableDebug(children.get(i), except);
+		}
+	}
+
+	/** Calls {@link #act(float)} with {@link Graphics#getDeltaTime()}, limited to a minimum of 30fps. */
 	public void act () {
 		act(Math.min(Gdx.graphics.getDeltaTime(), 1 / 30f));
 	}
@@ -196,27 +198,16 @@ public class Stage extends InputAdapter implements Disposable {
 		// Update over actors. Done in act() because actors may change position, which can fire enter/exit without an input event.
 		for (int pointer = 0, n = pointerOverActors.length; pointer < n; pointer++) {
 			Actor overLast = pointerOverActors[pointer];
-			// Check if pointer is gone.
-			if (!pointerTouched[pointer]) {
-				if (overLast != null) {
-					pointerOverActors[pointer] = null;
-					screenToStageCoordinates(stageCoords.set(pointerScreenX[pointer], pointerScreenY[pointer]));
-					// Exit over last.
-					InputEvent event = Pools.obtain(InputEvent.class);
-					event.setType(InputEvent.Type.exit);
-					event.setStage(this);
-					event.setStageX(stageCoords.x);
-					event.setStageY(stageCoords.y);
-					event.setRelatedActor(overLast);
-					event.setPointer(pointer);
-					overLast.fire(event);
-					Pools.free(event);
-				}
-				continue;
+			if (pointerTouched[pointer]) {
+				// Update the over actor for the pointer.
+				pointerOverActors[pointer] = fireEnterAndExit(overLast, pointerScreenX[pointer], pointerScreenY[pointer], pointer);
+			} else if (overLast != null) {
+				// The pointer is gone, exit the over actor for the pointer, if any.
+				pointerOverActors[pointer] = null;
+				fireExit(overLast, pointerScreenX[pointer], pointerScreenY[pointer], pointer);
 			}
-			// Update over actor for the pointer.
-			pointerOverActors[pointer] = fireEnterAndExit(overLast, pointerScreenX[pointer], pointerScreenY[pointer], pointer);
 		}
+
 		// Update over actor for the mouse on the desktop.
 		ApplicationType type = Gdx.app.getType();
 		if (type == ApplicationType.Desktop || type == ApplicationType.Applet || type == ApplicationType.WebGL)
@@ -225,64 +216,85 @@ public class Stage extends InputAdapter implements Disposable {
 		root.act(delta);
 	}
 
-	private Actor fireEnterAndExit (Actor overLast, int screenX, int screenY, int pointer) {
+	private @Null Actor fireEnterAndExit (@Null Actor overLast, int screenX, int screenY, int pointer) {
 		// Find the actor under the point.
-		screenToStageCoordinates(stageCoords.set(screenX, screenY));
-		Actor over = hit(stageCoords.x, stageCoords.y, true);
+		screenToStageCoordinates(tempCoords.set(screenX, screenY));
+		Actor over = hit(tempCoords.x, tempCoords.y, true);
 		if (over == overLast) return overLast;
 
-		InputEvent event = Pools.obtain(InputEvent.class);
-		event.setStage(this);
-		event.setStageX(stageCoords.x);
-		event.setStageY(stageCoords.y);
-		event.setPointer(pointer);
 		// Exit overLast.
 		if (overLast != null) {
+			InputEvent event = pools.obtain(InputEvent.class);
 			event.setType(InputEvent.Type.exit);
+			event.setStage(this);
+			event.setStageX(tempCoords.x);
+			event.setStageY(tempCoords.y);
+			event.setPointer(pointer);
 			event.setRelatedActor(over);
 			overLast.fire(event);
+			pools.free(event);
 		}
+
 		// Enter over.
 		if (over != null) {
+			InputEvent event = pools.obtain(InputEvent.class);
 			event.setType(InputEvent.Type.enter);
+			event.setStage(this);
+			event.setStageX(tempCoords.x);
+			event.setStageY(tempCoords.y);
+			event.setPointer(pointer);
 			event.setRelatedActor(overLast);
 			over.fire(event);
+			pools.free(event);
 		}
-		Pools.free(event);
 		return over;
 	}
 
-	/** Applies a touch down event to the stage and returns true if an actor in the scene {@link Event#handle() handled} the event. */
+	private void fireExit (Actor actor, int screenX, int screenY, int pointer) {
+		screenToStageCoordinates(tempCoords.set(screenX, screenY));
+		InputEvent event = pools.obtain(InputEvent.class);
+		event.setType(InputEvent.Type.exit);
+		event.setStage(this);
+		event.setStageX(tempCoords.x);
+		event.setStageY(tempCoords.y);
+		event.setPointer(pointer);
+		event.setRelatedActor(actor);
+		actor.fire(event);
+		pools.free(event);
+	}
+
+	/** Applies a touch down event to the stage and returns true if an actor in the scene {@link Event#handle() handled} the
+	 * event. */
 	public boolean touchDown (int screenX, int screenY, int pointer, int button) {
-		if (screenX < viewportX || screenX >= viewportX + viewportWidth) return false;
-		if (Gdx.graphics.getHeight() - screenY < viewportY || Gdx.graphics.getHeight() - screenY >= viewportY + viewportHeight)
-			return false;
+		if (!isInsideViewport(screenX, screenY)) return false;
 
 		pointerTouched[pointer] = true;
 		pointerScreenX[pointer] = screenX;
 		pointerScreenY[pointer] = screenY;
 
-		screenToStageCoordinates(stageCoords.set(screenX, screenY));
+		screenToStageCoordinates(tempCoords.set(screenX, screenY));
 
-		InputEvent event = Pools.obtain(InputEvent.class);
+		InputEvent event = pools.obtain(InputEvent.class);
 		event.setType(Type.touchDown);
 		event.setStage(this);
-		event.setStageX(stageCoords.x);
-		event.setStageY(stageCoords.y);
+		event.setStageX(tempCoords.x);
+		event.setStageY(tempCoords.y);
 		event.setPointer(pointer);
 		event.setButton(button);
 
-		Actor target = hit(stageCoords.x, stageCoords.y, true);
-		if (target == null) target = root;
+		Actor target = hit(tempCoords.x, tempCoords.y, true);
+		if (target == null) {
+			if (root.getTouchable() == Touchable.enabled) root.fire(event);
+		} else
+			target.fire(event);
 
-		target.fire(event);
 		boolean handled = event.isHandled();
-		Pools.free(event);
+		pools.free(event);
 		return handled;
 	}
 
-	/** Applies a touch moved event to the stage and returns true if an actor in the scene {@link Event#handle() handled} the event.
-	 * Only {@link InputListener listeners} that returned true for touchDown will receive this event. */
+	/** Applies a touch moved event to the stage and returns true if an actor in the scene {@link Event#handle() handled} the
+	 * event. Only {@link InputListener listeners} that returned true for touchDown will receive this event. */
 	public boolean touchDragged (int screenX, int screenY, int pointer) {
 		pointerScreenX[pointer] = screenX;
 		pointerScreenY[pointer] = screenY;
@@ -291,13 +303,13 @@ public class Stage extends InputAdapter implements Disposable {
 
 		if (touchFocuses.size == 0) return false;
 
-		screenToStageCoordinates(stageCoords.set(screenX, screenY));
+		screenToStageCoordinates(tempCoords.set(screenX, screenY));
 
-		InputEvent event = Pools.obtain(InputEvent.class);
+		InputEvent event = pools.obtain(InputEvent.class);
 		event.setType(Type.touchDragged);
 		event.setStage(this);
-		event.setStageX(stageCoords.x);
-		event.setStageY(stageCoords.y);
+		event.setStageX(tempCoords.x);
+		event.setStageY(tempCoords.y);
 		event.setPointer(pointer);
 
 		SnapshotArray<TouchFocus> touchFocuses = this.touchFocuses;
@@ -305,6 +317,7 @@ public class Stage extends InputAdapter implements Disposable {
 		for (int i = 0, n = touchFocuses.size; i < n; i++) {
 			TouchFocus focus = focuses[i];
 			if (focus.pointer != pointer) continue;
+			if (!touchFocuses.contains(focus, true)) continue; // Touch focus already gone.
 			event.setTarget(focus.target);
 			event.setListenerActor(focus.listenerActor);
 			if (focus.listener.handle(event)) event.handle();
@@ -312,7 +325,7 @@ public class Stage extends InputAdapter implements Disposable {
 		touchFocuses.end();
 
 		boolean handled = event.isHandled();
-		Pools.free(event);
+		pools.free(event);
 		return handled;
 	}
 
@@ -325,13 +338,13 @@ public class Stage extends InputAdapter implements Disposable {
 
 		if (touchFocuses.size == 0) return false;
 
-		screenToStageCoordinates(stageCoords.set(screenX, screenY));
+		screenToStageCoordinates(tempCoords.set(screenX, screenY));
 
-		InputEvent event = Pools.obtain(InputEvent.class);
+		InputEvent event = pools.obtain(InputEvent.class);
 		event.setType(Type.touchUp);
 		event.setStage(this);
-		event.setStageX(stageCoords.x);
-		event.setStageY(stageCoords.y);
+		event.setStageX(tempCoords.x);
+		event.setStageY(tempCoords.y);
 		event.setPointer(pointer);
 		event.setButton(button);
 
@@ -344,58 +357,62 @@ public class Stage extends InputAdapter implements Disposable {
 			event.setTarget(focus.target);
 			event.setListenerActor(focus.listenerActor);
 			if (focus.listener.handle(event)) event.handle();
-			Pools.free(focus);
+			pools.free(focus);
 		}
 		touchFocuses.end();
 
 		boolean handled = event.isHandled();
-		Pools.free(event);
+		pools.free(event);
 		return handled;
 	}
 
-	/** Applies a mouse moved event to the stage and returns true if an actor in the scene {@link Event#handle() handled} the event.
-	 * This event only occurs on the desktop. */
-	public boolean mouseMoved (int screenX, int screenY) {
-		if (screenX < viewportX || screenX >= viewportX + viewportWidth) return false;
-		if (Gdx.graphics.getHeight() - screenY < viewportY || Gdx.graphics.getHeight() - screenY >= viewportY + viewportHeight)
-			return false;
+	public boolean touchCancelled (int screenX, int screenY, int pointer, int button) {
+		cancelTouchFocus();
+		return false;
+	}
 
+	/** Applies a mouse moved event to the stage and returns true if an actor in the scene {@link Event#handle() handled} the
+	 * event. This event only occurs on the desktop. */
+	public boolean mouseMoved (int screenX, int screenY) {
 		mouseScreenX = screenX;
 		mouseScreenY = screenY;
 
-		screenToStageCoordinates(stageCoords.set(screenX, screenY));
+		if (!isInsideViewport(screenX, screenY)) return false;
 
-		InputEvent event = Pools.obtain(InputEvent.class);
-		event.setStage(this);
+		screenToStageCoordinates(tempCoords.set(screenX, screenY));
+
+		InputEvent event = pools.obtain(InputEvent.class);
 		event.setType(Type.mouseMoved);
-		event.setStageX(stageCoords.x);
-		event.setStageY(stageCoords.y);
+		event.setStage(this);
+		event.setStageX(tempCoords.x);
+		event.setStageY(tempCoords.y);
 
-		Actor target = hit(stageCoords.x, stageCoords.y, true);
+		Actor target = hit(tempCoords.x, tempCoords.y, true);
 		if (target == null) target = root;
 
 		target.fire(event);
 		boolean handled = event.isHandled();
-		Pools.free(event);
+		pools.free(event);
 		return handled;
 	}
 
 	/** Applies a mouse scroll event to the stage and returns true if an actor in the scene {@link Event#handle() handled} the
 	 * event. This event only occurs on the desktop. */
-	public boolean scrolled (int amount) {
+	public boolean scrolled (float amountX, float amountY) {
 		Actor target = scrollFocus == null ? root : scrollFocus;
 
-		screenToStageCoordinates(stageCoords.set(mouseScreenX, mouseScreenY));
+		screenToStageCoordinates(tempCoords.set(mouseScreenX, mouseScreenY));
 
-		InputEvent event = Pools.obtain(InputEvent.class);
-		event.setStage(this);
+		InputEvent event = pools.obtain(InputEvent.class);
 		event.setType(InputEvent.Type.scrolled);
-		event.setScrollAmount(amount);
-		event.setStageX(stageCoords.x);
-		event.setStageY(stageCoords.y);
+		event.setStage(this);
+		event.setStageX(tempCoords.x);
+		event.setStageY(tempCoords.y);
+		event.setScrollAmountX(amountX);
+		event.setScrollAmountY(amountY);
 		target.fire(event);
 		boolean handled = event.isHandled();
-		Pools.free(event);
+		pools.free(event);
 		return handled;
 	}
 
@@ -403,13 +420,13 @@ public class Stage extends InputAdapter implements Disposable {
 	 * true if the event was {@link Event#handle() handled}. */
 	public boolean keyDown (int keyCode) {
 		Actor target = keyboardFocus == null ? root : keyboardFocus;
-		InputEvent event = Pools.obtain(InputEvent.class);
-		event.setStage(this);
+		InputEvent event = pools.obtain(InputEvent.class);
 		event.setType(InputEvent.Type.keyDown);
+		event.setStage(this);
 		event.setKeyCode(keyCode);
 		target.fire(event);
 		boolean handled = event.isHandled();
-		Pools.free(event);
+		pools.free(event);
 		return handled;
 	}
 
@@ -417,13 +434,13 @@ public class Stage extends InputAdapter implements Disposable {
 	 * if the event was {@link Event#handle() handled}. */
 	public boolean keyUp (int keyCode) {
 		Actor target = keyboardFocus == null ? root : keyboardFocus;
-		InputEvent event = Pools.obtain(InputEvent.class);
-		event.setStage(this);
+		InputEvent event = pools.obtain(InputEvent.class);
 		event.setType(InputEvent.Type.keyUp);
+		event.setStage(this);
 		event.setKeyCode(keyCode);
 		target.fire(event);
 		boolean handled = event.isHandled();
-		Pools.free(event);
+		pools.free(event);
 		return handled;
 	}
 
@@ -431,20 +448,22 @@ public class Stage extends InputAdapter implements Disposable {
 	 * true if the event was {@link Event#handle() handled}. */
 	public boolean keyTyped (char character) {
 		Actor target = keyboardFocus == null ? root : keyboardFocus;
-		InputEvent event = Pools.obtain(InputEvent.class);
-		event.setStage(this);
+		InputEvent event = pools.obtain(InputEvent.class);
 		event.setType(InputEvent.Type.keyTyped);
+		event.setStage(this);
 		event.setCharacter(character);
 		target.fire(event);
 		boolean handled = event.isHandled();
-		Pools.free(event);
+		pools.free(event);
 		return handled;
 	}
 
-	/** Adds the listener to be notified for all touchDragged and touchUp events for the specified pointer and button. The actor
-	 * will be used as the {@link Event#getListenerActor() listener actor} and {@link Event#getTarget() target}. */
+	/** Adds the listener to be notified for all touchDragged and touchUp events for the specified pointer and button. Touch focus
+	 * is added automatically when true is returned from {@link InputListener#touchDown(InputEvent, float, float, int, int)
+	 * touchDown}. The specified actors will be used as the {@link Event#getListenerActor() listener actor} and
+	 * {@link Event#getTarget() target} for the touchDragged and touchUp events. */
 	public void addTouchFocus (EventListener listener, Actor listenerActor, Actor target, int pointer, int button) {
-		TouchFocus focus = Pools.obtain(TouchFocus.class);
+		TouchFocus focus = pools.obtain(TouchFocus.class);
 		focus.listenerActor = listenerActor;
 		focus.target = target;
 		focus.listener = listener;
@@ -453,8 +472,8 @@ public class Stage extends InputAdapter implements Disposable {
 		touchFocuses.add(focus);
 	}
 
-	/** Removes the listener from being notified for all touchDragged and touchUp events for the specified pointer and button. Note
-	 * the listener may never receive a touchUp event if this method is used. */
+	/** Removes touch focus for the specified listener, pointer, and button. Note the listener will not receive a touchUp event
+	 * when this method is used. */
 	public void removeTouchFocus (EventListener listener, Actor listenerActor, Actor target, int pointer, int button) {
 		SnapshotArray<TouchFocus> touchFocuses = this.touchFocuses;
 		for (int i = touchFocuses.size - 1; i >= 0; i--) {
@@ -462,25 +481,57 @@ public class Stage extends InputAdapter implements Disposable {
 			if (focus.listener == listener && focus.listenerActor == listenerActor && focus.target == target
 				&& focus.pointer == pointer && focus.button == button) {
 				touchFocuses.removeIndex(i);
-				Pools.free(focus);
+				pools.free(focus);
 			}
 		}
 	}
 
-	/** Sends a touchUp event to all listeners that are registered to receive touchDragged and touchUp events and removes their
-	 * touch focus. This method removes all touch focus listeners, but sends a touchUp event so that the state of the listeners
-	 * remains consistent (listeners typically expect to receive touchUp eventually). The location of the touchUp is
-	 * {@link Integer#MIN_VALUE}. Listeners can use {@link InputEvent#isTouchFocusCancel()} to ignore this event if needed. */
+	/** Cancels touch focus for all listeners with the specified listener actor.
+	 * @see #cancelTouchFocus() */
+	public void cancelTouchFocus (Actor listenerActor) {
+		// Cancel all current touch focuses for the specified listener, allowing for concurrent modification, and never cancel the
+		// same focus twice.
+		InputEvent event = null;
+		SnapshotArray<TouchFocus> touchFocuses = this.touchFocuses;
+		TouchFocus[] items = touchFocuses.begin();
+		for (int i = 0, n = touchFocuses.size; i < n; i++) {
+			TouchFocus focus = items[i];
+			if (focus.listenerActor != listenerActor) continue;
+			if (!touchFocuses.removeValue(focus, true)) continue; // Touch focus already gone.
+
+			if (event == null) {
+				event = pools.obtain(InputEvent.class);
+				event.setType(InputEvent.Type.touchUp);
+				event.setStage(this);
+				event.setStageX(Integer.MIN_VALUE);
+				event.setStageY(Integer.MIN_VALUE);
+			}
+
+			event.setTarget(focus.target);
+			event.setListenerActor(focus.listenerActor);
+			event.setPointer(focus.pointer);
+			event.setButton(focus.button);
+			focus.listener.handle(event);
+			// Cannot return TouchFocus to pool, as it may still be in use (eg if cancelTouchFocus is called from touchDragged).
+		}
+		touchFocuses.end();
+
+		if (event != null) pools.free(event);
+	}
+
+	/** Removes all touch focus listeners, sending a touchUp event to each listener. Listeners typically expect to receive a
+	 * touchUp event when they have touch focus. The location of the touchUp is {@link Integer#MIN_VALUE}. Listeners can use
+	 * {@link InputEvent#isTouchFocusCancel()} to ignore this event if needed. */
 	public void cancelTouchFocus () {
-		cancelTouchFocus(null, null);
+		cancelTouchFocusExcept(null, null);
 	}
 
 	/** Cancels touch focus for all listeners except the specified listener.
 	 * @see #cancelTouchFocus() */
-	public void cancelTouchFocus (EventListener listener, Actor actor) {
-		InputEvent event = Pools.obtain(InputEvent.class);
-		event.setStage(this);
+	public void cancelTouchFocusExcept (@Null EventListener exceptListener, @Null Actor exceptActor) {
+		InputEvent event = pools.obtain(InputEvent.class);
 		event.setType(InputEvent.Type.touchUp);
+		event.setStage(this);
 		event.setStageX(Integer.MIN_VALUE);
 		event.setStageY(Integer.MIN_VALUE);
 
@@ -490,7 +541,7 @@ public class Stage extends InputAdapter implements Disposable {
 		TouchFocus[] items = touchFocuses.begin();
 		for (int i = 0, n = touchFocuses.size; i < n; i++) {
 			TouchFocus focus = items[i];
-			if (focus.listener == listener && focus.listenerActor == actor) continue;
+			if (focus.listener == exceptListener && focus.listenerActor == exceptActor) continue;
 			if (!touchFocuses.removeValue(focus, true)) continue; // Touch focus already gone.
 			event.setTarget(focus.target);
 			event.setListenerActor(focus.listenerActor);
@@ -501,12 +552,11 @@ public class Stage extends InputAdapter implements Disposable {
 		}
 		touchFocuses.end();
 
-		Pools.free(event);
+		pools.free(event);
 	}
 
 	/** Adds an actor to the root of the stage.
-	 * @see Group#addActor(Actor)
-	 * @see Actor#remove() */
+	 * @see Group#addActor(Actor) */
 	public void addActor (Actor actor) {
 		root.addActor(actor);
 	}
@@ -520,7 +570,7 @@ public class Stage extends InputAdapter implements Disposable {
 	/** Returns the root's child actors.
 	 * @see Group#getChildren() */
 	public Array<Actor> getActors () {
-		return root.getChildren();
+		return root.children;
 	}
 
 	/** Adds a listener to the root.
@@ -547,6 +597,23 @@ public class Stage extends InputAdapter implements Disposable {
 		return root.removeCaptureListener(listener);
 	}
 
+	/** Called just before an actor is removed from a group.
+	 * <p>
+	 * The default implementation fires an {@link InputEvent.Type#exit} event if a pointer had entered the actor. */
+	protected void actorRemoved (Actor actor) {
+		for (int pointer = 0, n = pointerOverActors.length; pointer < n; pointer++) {
+			if (actor == pointerOverActors[pointer]) {
+				pointerOverActors[pointer] = null;
+				fireExit(actor, pointerScreenX[pointer], pointerScreenY[pointer], pointer);
+			}
+		}
+
+		if (actor == mouseOverActor) {
+			mouseOverActor = null;
+			fireExit(actor, mouseScreenX, mouseScreenY, -1);
+		}
+	}
+
 	/** Removes the root's children, actions, and listeners. */
 	public void clear () {
 		unfocusAll();
@@ -555,22 +622,24 @@ public class Stage extends InputAdapter implements Disposable {
 
 	/** Removes the touch, keyboard, and scroll focused actors. */
 	public void unfocusAll () {
-		scrollFocus = null;
-		keyboardFocus = null;
+		setScrollFocus(null);
+		setKeyboardFocus(null);
 		cancelTouchFocus();
 	}
 
 	/** Removes the touch, keyboard, and scroll focus for the specified actor and any descendants. */
 	public void unfocus (Actor actor) {
-		if (scrollFocus != null && scrollFocus.isDescendantOf(actor)) scrollFocus = null;
-		if (keyboardFocus != null && keyboardFocus.isDescendantOf(actor)) keyboardFocus = null;
+		cancelTouchFocus(actor);
+		if (scrollFocus != null && scrollFocus.isDescendantOf(actor)) setScrollFocus(null);
+		if (keyboardFocus != null && keyboardFocus.isDescendantOf(actor)) setKeyboardFocus(null);
 	}
 
 	/** Sets the actor that will receive key events.
-	 * @param actor May be null. */
-	public void setKeyboardFocus (Actor actor) {
-		if (keyboardFocus == actor) return;
-		FocusEvent event = Pools.obtain(FocusEvent.class);
+	 * @param actor May be null.
+	 * @return true if the unfocus and focus events were not cancelled by a {@link FocusListener}. */
+	public boolean setKeyboardFocus (@Null Actor actor) {
+		if (keyboardFocus == actor) return true;
+		FocusEvent event = pools.obtain(FocusEvent.class);
 		event.setStage(this);
 		event.setType(FocusEvent.Type.keyboard);
 		Actor oldKeyboardFocus = keyboardFocus;
@@ -579,92 +648,87 @@ public class Stage extends InputAdapter implements Disposable {
 			event.setRelatedActor(actor);
 			oldKeyboardFocus.fire(event);
 		}
-		if (!event.isCancelled()) {
+		boolean success = !event.isCancelled();
+		if (success) {
 			keyboardFocus = actor;
 			if (actor != null) {
 				event.setFocused(true);
 				event.setRelatedActor(oldKeyboardFocus);
 				actor.fire(event);
-				if (event.isCancelled()) setKeyboardFocus(oldKeyboardFocus);
+				success = !event.isCancelled();
+				if (!success) keyboardFocus = oldKeyboardFocus;
 			}
 		}
-		Pools.free(event);
+		pools.free(event);
+		return success;
 	}
 
 	/** Gets the actor that will receive key events.
 	 * @return May be null. */
-	public Actor getKeyboardFocus () {
+	public @Null Actor getKeyboardFocus () {
 		return keyboardFocus;
 	}
 
 	/** Sets the actor that will receive scroll events.
-	 * @param actor May be null. */
-	public void setScrollFocus (Actor actor) {
-		if (scrollFocus == actor) return;
-		FocusEvent event = Pools.obtain(FocusEvent.class);
+	 * @param actor May be null.
+	 * @return true if the unfocus and focus events were not cancelled by a {@link FocusListener}. */
+	public boolean setScrollFocus (@Null Actor actor) {
+		if (scrollFocus == actor) return true;
+		FocusEvent event = pools.obtain(FocusEvent.class);
 		event.setStage(this);
 		event.setType(FocusEvent.Type.scroll);
-		Actor oldScrollFocus = keyboardFocus;
+		Actor oldScrollFocus = scrollFocus;
 		if (oldScrollFocus != null) {
 			event.setFocused(false);
 			event.setRelatedActor(actor);
 			oldScrollFocus.fire(event);
 		}
-		if (!event.isCancelled()) {
+		boolean success = !event.isCancelled();
+		if (success) {
 			scrollFocus = actor;
 			if (actor != null) {
 				event.setFocused(true);
 				event.setRelatedActor(oldScrollFocus);
 				actor.fire(event);
-				if (event.isCancelled()) setScrollFocus(oldScrollFocus);
+				success = !event.isCancelled();
+				if (!success) scrollFocus = oldScrollFocus;
 			}
 		}
-		Pools.free(event);
+		pools.free(event);
+		return success;
 	}
 
 	/** Gets the actor that will receive scroll events.
 	 * @return May be null. */
-	public Actor getScrollFocus () {
+	public @Null Actor getScrollFocus () {
 		return scrollFocus;
 	}
 
-	/** The width of the stage's viewport.
-	 * @see #setViewport(float, float, boolean) */
-	public float getWidth () {
-		return width;
-	}
-
-	/** The height of the stage's viewport.
-	 * @see #setViewport(float, float, boolean) */
-	public float getHeight () {
-		return height;
-	}
-
-	/** Half the amount in the x direction that the stage's viewport was lengthened to fill the screen.
-	 * @see #setViewport(float, float, boolean) */
-	public float getGutterWidth () {
-		return gutterWidth;
-	}
-
-	/** Half the amount in the y direction that the stage's viewport was lengthened to fill the screen.
-	 * @see #setViewport(float, float, boolean) */
-	public float getGutterHeight () {
-		return gutterHeight;
-	}
-
-	public Batch getSpriteBatch () {
+	public Batch getBatch () {
 		return batch;
 	}
 
-	public Camera getCamera () {
-		return camera;
+	public Viewport getViewport () {
+		return viewport;
 	}
 
-	/** Sets the stage's camera. The camera must be configured properly or {@link #setViewport(float, float, boolean)} can be called
-	 * after the camera is set. {@link Stage#draw()} will call {@link Camera#update()} and use the {@link Camera#combined} matrix
-	 * for the Batch {@link Batch#setProjectionMatrix(com.badlogic.gdx.math.Matrix4) projection matrix}. */
-	public void setCamera (Camera camera) {
-		this.camera = camera;
+	public void setViewport (Viewport viewport) {
+		this.viewport = viewport;
+	}
+
+	/** The viewport's world width. */
+	public float getWidth () {
+		return viewport.getWorldWidth();
+	}
+
+	/** The viewport's world height. */
+	public float getHeight () {
+		return viewport.getWorldHeight();
+	}
+
+	/** The viewport's camera. */
+	public Camera getCamera () {
+		return viewport.getCamera();
 	}
 
 	/** Returns the root group which holds all actors in the stage. */
@@ -672,31 +736,37 @@ public class Stage extends InputAdapter implements Disposable {
 		return root;
 	}
 
+	/** Replaces the root group. This can be useful, for example, to subclass the root group to be notified by
+	 * {@link Group#childrenChanged()}. */
+	public void setRoot (Group root) {
+		if (root.parent != null) root.parent.removeActor(root, false);
+		this.root = root;
+		root.setParent(null);
+		root.setStage(this);
+	}
+
 	/** Returns the {@link Actor} at the specified location in stage coordinates. Hit testing is performed in the order the actors
 	 * were inserted into the stage, last inserted actors being tested first. To get stage coordinates from screen coordinates, use
 	 * {@link #screenToStageCoordinates(Vector2)}.
 	 * @param touchable If true, the hit detection will respect the {@link Actor#setTouchable(Touchable) touchability}.
 	 * @return May be null if no actor was hit. */
-	public Actor hit (float stageX, float stageY, boolean touchable) {
-		root.parentToLocalCoordinates(actorCoords.set(stageX, stageY));
-		return root.hit(actorCoords.x, actorCoords.y, touchable);
+	public @Null Actor hit (float stageX, float stageY, boolean touchable) {
+		root.parentToLocalCoordinates(tempCoords.set(stageX, stageY));
+		return root.hit(tempCoords.x, tempCoords.y, touchable);
 	}
 
 	/** Transforms the screen coordinates to stage coordinates.
 	 * @param screenCoords Input screen coordinates and output for resulting stage coordinates. */
 	public Vector2 screenToStageCoordinates (Vector2 screenCoords) {
-		camera.unproject(cameraCoords.set(screenCoords.x, screenCoords.y, 0), viewportX, viewportY, viewportWidth, viewportHeight);
-		screenCoords.x = cameraCoords.x;
-		screenCoords.y = cameraCoords.y;
+		viewport.unproject(screenCoords);
 		return screenCoords;
 	}
 
 	/** Transforms the stage coordinates to screen coordinates.
 	 * @param stageCoords Input stage coordinates and output for resulting screen coordinates. */
 	public Vector2 stageToScreenCoordinates (Vector2 stageCoords) {
-		camera.project(cameraCoords.set(stageCoords.x, stageCoords.y, 0), viewportX, viewportY, viewportWidth, viewportHeight);
-		stageCoords.x = cameraCoords.x;
-		stageCoords.y = viewportHeight - cameraCoords.y;
+		viewport.project(stageCoords);
+		stageCoords.y = Gdx.graphics.getHeight() - stageCoords.y;
 		return stageCoords;
 	}
 
@@ -705,18 +775,109 @@ public class Stage extends InputAdapter implements Disposable {
 	 * {@link Actor#draw(Batch, float)}.
 	 * @see Actor#localToStageCoordinates(Vector2) */
 	public Vector2 toScreenCoordinates (Vector2 coords, Matrix4 transformMatrix) {
-		ScissorStack.toWindowCoordinates(camera, transformMatrix, coords);
-		return coords;
+		return viewport.toScreenCoordinates(coords, transformMatrix);
 	}
 
-	public void calculateScissors (Rectangle area, Rectangle scissor) {
-		ScissorStack.calculateScissors(camera, viewportX, viewportY, viewportWidth, viewportHeight, batch.getTransformMatrix(),
-			area, scissor);
+	/** Calculates window scissor coordinates from local coordinates using the batch's current transformation matrix.
+	 * @see ScissorStack#calculateScissors(Camera, float, float, float, float, Matrix4, Rectangle, Rectangle) */
+	public void calculateScissors (Rectangle localRect, Rectangle scissorRect) {
+		Matrix4 transformMatrix;
+		if (debugShapes != null && debugShapes.isDrawing())
+			transformMatrix = debugShapes.getTransformMatrix();
+		else
+			transformMatrix = batch.getTransformMatrix();
+		viewport.calculateScissors(transformMatrix, localRect, scissorRect);
+	}
+
+	/** If true, any actions executed during a call to {@link #act()}) will result in a call to
+	 * {@link Graphics#requestRendering()}. Widgets that animate or otherwise require additional rendering may check this setting
+	 * before calling {@link Graphics#requestRendering()}. Default is true. */
+	public void setActionsRequestRendering (boolean actionsRequestRendering) {
+		this.actionsRequestRendering = actionsRequestRendering;
+	}
+
+	public boolean getActionsRequestRendering () {
+		return actionsRequestRendering;
+	}
+
+	/** The default color that can be used by actors to draw debug lines. */
+	public Color getDebugColor () {
+		return debugColor;
+	}
+
+	/** If true, debug lines are shown for actors even when {@link Actor#isVisible()} is false. */
+	public void setDebugInvisible (boolean debugInvisible) {
+		this.debugInvisible = debugInvisible;
+	}
+
+	/** If true, debug lines are shown for all actors. */
+	public void setDebugAll (boolean debugAll) {
+		if (this.debugAll == debugAll) return;
+		this.debugAll = debugAll;
+		if (debugAll)
+			debug = true;
+		else
+			root.setDebug(false, true);
+	}
+
+	public boolean isDebugAll () {
+		return debugAll;
+	}
+
+	/** If true, debug is enabled only for the actor under the mouse. Can be combined with {@link #setDebugAll(boolean)}. */
+	public void setDebugUnderMouse (boolean debugUnderMouse) {
+		if (this.debugUnderMouse == debugUnderMouse) return;
+		this.debugUnderMouse = debugUnderMouse;
+		if (debugUnderMouse)
+			debug = true;
+		else
+			root.setDebug(false, true);
+	}
+
+	/** If true, debug is enabled only for the parent of the actor under the mouse. Can be combined with
+	 * {@link #setDebugAll(boolean)}. */
+	public void setDebugParentUnderMouse (boolean debugParentUnderMouse) {
+		if (this.debugParentUnderMouse == debugParentUnderMouse) return;
+		this.debugParentUnderMouse = debugParentUnderMouse;
+		if (debugParentUnderMouse)
+			debug = true;
+		else
+			root.setDebug(false, true);
+	}
+
+	/** If not {@link Debug#none}, debug is enabled only for the first ascendant of the actor under the mouse that is a table. Can
+	 * be combined with {@link #setDebugAll(boolean)}.
+	 * @param debugTableUnderMouse May be null for {@link Debug#none}. */
+	public void setDebugTableUnderMouse (@Null Debug debugTableUnderMouse) {
+		if (debugTableUnderMouse == null) debugTableUnderMouse = Debug.none;
+		if (this.debugTableUnderMouse == debugTableUnderMouse) return;
+		this.debugTableUnderMouse = debugTableUnderMouse;
+		if (debugTableUnderMouse != Debug.none)
+			debug = true;
+		else
+			root.setDebug(false, true);
+	}
+
+	/** If true, debug is enabled only for the first ascendant of the actor under the mouse that is a table. Can be combined with
+	 * {@link #setDebugAll(boolean)}. */
+	public void setDebugTableUnderMouse (boolean debugTableUnderMouse) {
+		setDebugTableUnderMouse(debugTableUnderMouse ? Debug.all : Debug.none);
 	}
 
 	public void dispose () {
 		clear();
 		if (ownsBatch) batch.dispose();
+		if (debugShapes != null) debugShapes.dispose();
+	}
+
+	/** Check if screen coordinates are inside the viewport's screen area. */
+	protected boolean isInsideViewport (int screenX, int screenY) {
+		int x0 = viewport.getScreenX();
+		int x1 = x0 + viewport.getScreenWidth();
+		int y0 = viewport.getScreenY();
+		int y1 = y0 + viewport.getScreenHeight();
+		screenY = Gdx.graphics.getHeight() - 1 - screenY;
+		return screenX >= x0 && screenX < x1 && screenY >= y0 && screenY < y1;
 	}
 
 	/** Internal class for managing touch focus. Public only for GWT.
@@ -729,6 +890,7 @@ public class Stage extends InputAdapter implements Disposable {
 		public void reset () {
 			listenerActor = null;
 			listener = null;
+			target = null;
 		}
 	}
 }

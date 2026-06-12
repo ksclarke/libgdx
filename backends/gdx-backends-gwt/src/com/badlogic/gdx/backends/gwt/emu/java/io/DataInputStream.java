@@ -18,11 +18,12 @@ package java.io;
 
 import com.google.gwt.corp.compatibility.Numbers;
 
-public class DataInputStream extends InputStream implements DataInput {
+public class DataInputStream extends FilterInputStream implements DataInput {
 
 	private final InputStream is;
 
 	public DataInputStream (final InputStream is) {
+		super(is);
 		this.is = is;
 	}
 
@@ -50,7 +51,7 @@ public class DataInputStream extends InputStream implements DataInput {
 	}
 
 	public double readDouble () throws IOException {
-		return Double.longBitsToDouble(readLong());
+		return Numbers.longBitsToDouble(readLong());
 	}
 
 	public float readFloat () throws IOException {
@@ -86,8 +87,8 @@ public class DataInputStream extends InputStream implements DataInput {
 
 	public long readLong () throws IOException {
 		long a = readInt();
-		long b = readInt() & 0x0ffffffff;
-		return (a << 32) | b;
+		long b = readInt();
+		return (a << 32) | (b & 0xffffffffL);
 	}
 
 	public short readShort () throws IOException {
@@ -146,11 +147,6 @@ public class DataInputStream extends InputStream implements DataInput {
 		return 0;
 	}
 
-	@Override
-	public int available () {
-		return is.available();
-	}
-	
 	@Override
 	public void close () throws IOException {
 		is.close();

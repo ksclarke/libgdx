@@ -24,7 +24,8 @@ package java.nio;
  * <ul>
  * <li>{@link #allocate(int) Allocate} a new float array and create a buffer based on it;</li>
  * <li>{@link #wrap(float[]) Wrap} an existing float array to create a new buffer;</li>
- * <li>Use {@link java.nio.ByteBuffer#asFloatBuffer() ByteBuffer.asFloatBuffer} to create a float buffer based on a byte buffer.</li>
+ * <li>Use {@link java.nio.ByteBuffer#asFloatBuffer() ByteBuffer.asFloatBuffer} to create a float buffer based on a byte
+ * buffer.</li>
  * </ul>
  * 
  * @since Android 1.0 */
@@ -57,7 +58,8 @@ public abstract class FloatBuffer extends Buffer implements Comparable<FloatBuff
 
 	/** Creates a new float buffer by wrapping the given float array.
 	 * <p>
-	 * The new buffer's position will be {@code start}, limit will be {@code start + len}, capacity will be the length of the array.
+	 * The new buffer's position will be {@code start}, limit will be {@code start + len}, capacity will be the length of the
+	 * array.
 	 * </p>
 	 * 
 	 * @param array the float array which the new buffer will be based on.
@@ -229,8 +231,8 @@ public abstract class FloatBuffer extends Buffer implements Comparable<FloatBuff
 		return get(dest, 0, dest.length);
 	}
 
-	/** Reads floats from the current position into the specified float array, starting from the specified offset, and increases the
-	 * position by the number of floats read.
+	/** Reads floats from the current position into the specified float array, starting from the specified offset, and increases
+	 * the position by the number of floats read.
 	 * 
 	 * @param dest the target float array.
 	 * @param off the offset of the float array, must not be negative and no greater than {@code dest.length}.
@@ -329,7 +331,8 @@ public abstract class FloatBuffer extends Buffer implements Comparable<FloatBuff
 	 * @since Android 1.0 */
 	public abstract FloatBuffer put (float f);
 
-	/** Writes floats from the given float array to the current position and increases the position by the number of floats written.
+	/** Writes floats from the given float array to the current position and increases the position by the number of floats
+	 * written.
 	 * <p>
 	 * Calling this method has the same effect as {@code put(src, 0, src.length)}.
 	 * </p>
@@ -421,14 +424,14 @@ public abstract class FloatBuffer extends Buffer implements Comparable<FloatBuff
 	 * @return a string representing the state of this float buffer.
 	 * @since Android 1.0 */
 	public String toString () {
-		StringBuffer buf = new StringBuffer();
-		buf.append(getClass().getName());
-		buf.append(", status: capacity="); //$NON-NLS-1$
-		buf.append(capacity());
-		buf.append(" position="); //$NON-NLS-1$
-		buf.append(position());
-		buf.append(" limit="); //$NON-NLS-1$
-		buf.append(limit());
-		return buf.toString();
+		StringBuilder sb = new StringBuilder();
+		sb.append(getClass().getName());
+		sb.append(", status: capacity="); //$NON-NLS-1$
+		sb.append(capacity());
+		sb.append(" position="); //$NON-NLS-1$
+		sb.append(position());
+		sb.append(" limit="); //$NON-NLS-1$
+		sb.append(limit());
+		return sb.toString();
 	}
 }

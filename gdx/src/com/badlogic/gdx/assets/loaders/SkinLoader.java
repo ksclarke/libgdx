@@ -43,7 +43,7 @@ public class SkinLoader extends AsynchronousAssetLoader<Skin, SkinLoader.SkinPar
 	@Override
 	public Array<AssetDescriptor> getDependencies (String fileName, FileHandle file, SkinParameter parameter) {
 		Array<AssetDescriptor> deps = new Array();
-		if (parameter == null)
+		if (parameter == null || parameter.textureAtlasPath == null)
 			deps.add(new AssetDescriptor(file.pathWithoutExtension() + ".atlas", TextureAtlas.class));
 		else if (parameter.textureAtlasPath != null) deps.add(new AssetDescriptor(parameter.textureAtlasPath, TextureAtlas.class));
 		return deps;
@@ -55,17 +55,18 @@ public class SkinLoader extends AsynchronousAssetLoader<Skin, SkinLoader.SkinPar
 
 	@Override
 	public Skin loadSync (AssetManager manager, String fileName, FileHandle file, SkinParameter parameter) {
-		String textureAtlasPath;
-		ObjectMap<String, Object> resources;
-		if (parameter == null) {
-			textureAtlasPath = file.pathWithoutExtension() + ".atlas";
-			resources = null;
-		} else {
-			textureAtlasPath = parameter.textureAtlasPath;
-			resources = parameter.resources;
+		String textureAtlasPath = file.pathWithoutExtension() + ".atlas";
+		ObjectMap<String, Object> resources = null;
+		if (parameter != null) {
+			if (parameter.textureAtlasPath != null) {
+				textureAtlasPath = parameter.textureAtlasPath;
+			}
+			if (parameter.resources != null) {
+				resources = parameter.resources;
+			}
 		}
 		TextureAtlas atlas = manager.get(textureAtlasPath, TextureAtlas.class);
-		Skin skin = new Skin(atlas);
+		Skin skin = newSkin(atlas);
 		if (resources != null) {
 			for (Entry<String, Object> entry : resources.entries()) {
 				skin.add(entry.key, entry.value);
@@ -75,12 +76,23 @@ public class SkinLoader extends AsynchronousAssetLoader<Skin, SkinLoader.SkinPar
 		return skin;
 	}
 
+	/** Override to allow subclasses of Skin to be loaded or the skin instance to be configured.
+	 * @param atlas The TextureAtlas that the skin will use.
+	 * @return A new Skin (or subclass of Skin) instance based on the provided TextureAtlas. */
+	protected Skin newSkin (TextureAtlas atlas) {
+		return new Skin(atlas);
+	}
+
 	static public class SkinParameter extends AssetLoaderParameters<Skin> {
 		public final String textureAtlasPath;
 		public final ObjectMap<String, Object> resources;
 
 		public SkinParameter () {
 			this(null, null);
+		}
+
+		public SkinParameter (ObjectMap<String, Object> resources) {
+			this(null, resources);
 		}
 
 		public SkinParameter (String textureAtlasPath) {

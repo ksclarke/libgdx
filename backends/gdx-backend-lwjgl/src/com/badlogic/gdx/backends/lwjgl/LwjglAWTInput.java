@@ -39,9 +39,7 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowFocusListener;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import javax.swing.JDialog;
 import javax.swing.JFrame;
@@ -56,13 +54,14 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
-import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.AbstractInput;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputProcessor;
-import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.input.NativeInputConfiguration;
+import com.badlogic.gdx.utils.IntSet;
 import com.badlogic.gdx.utils.Pool;
 
-public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener, MouseWheelListener, KeyListener {
+public class LwjglAWTInput extends AbstractInput implements MouseMotionListener, MouseListener, MouseWheelListener, KeyListener {
 	class KeyEvent {
 		static final int KEY_DOWN = 0;
 		static final int KEY_UP = 1;
@@ -102,6 +101,7 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 		}
 	};
 
+	private final LwjglAWTCanvas lwjglAwtCanvas;
 	List<KeyEvent> keyEvents = new ArrayList<KeyEvent>();
 	List<TouchEvent> touchEvents = new ArrayList<TouchEvent>();
 	int touchX = 0;
@@ -110,16 +110,17 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 	int deltaY = 0;
 	boolean touchDown = false;
 	boolean justTouched = false;
-	Set<Integer> keys = new HashSet<Integer>();
-	Set<Integer> pressedButtons = new HashSet<Integer>();
+	boolean[] justPressedButtons = new boolean[5];
+	IntSet pressedButtons = new IntSet();
 	InputProcessor processor;
 	Canvas canvas;
 	boolean catched = false;
 	Robot robot = null;
 	long currentEventTimeStamp;
 
-	public LwjglAWTInput (Canvas canvas) {
-		setListeners(canvas);
+	public LwjglAWTInput (LwjglAWTCanvas lwjglAwtCanvas) {
+		this.lwjglAwtCanvas = lwjglAwtCanvas;
+		setListeners(lwjglAwtCanvas.getCanvas());
 		try {
 			robot = new Robot(GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice());
 		} catch (HeadlessException e) {
@@ -158,21 +159,13 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 	}
 
 	@Override
-	public void getTextInput (final TextInputListener listener, final String title, final String text) {
-		SwingUtilities.invokeLater(new Runnable() {
-			@Override
-			public void run () {
-				String output = JOptionPane.showInputDialog(null, title, text);
-				if (output != null)
-					listener.input(output);
-				else
-					listener.canceled();
-
-			}
-		});
+	public void getTextInput (TextInputListener listener, String title, String text, String hint) {
+		getTextInput(listener, title, text, hint, OnscreenKeyboardType.Default);
 	}
 
-	public void getPlaceholderTextInput (final TextInputListener listener, final String title, final String placeholder) {
+	@Override
+	public void getTextInput (final TextInputListener listener, final String title, final String text, final String hint,
+		OnscreenKeyboardType type) {
 		SwingUtilities.invokeLater(new Runnable() {
 			@Override
 			public void run () {
@@ -188,10 +181,11 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 				panel.add(textPanel);
 
 				final JTextField textField = new JTextField(20);
+				textField.setText(text);
 				textField.setAlignmentX(0.0f);
 				textPanel.add(textField);
 
-				final JLabel placeholderLabel = new JLabel(placeholder);
+				final JLabel placeholderLabel = new JLabel(hint);
 				placeholderLabel.setForeground(Color.GRAY);
 				placeholderLabel.setAlignmentX(0.0f);
 				textPanel.add(placeholderLabel, 0);
@@ -262,6 +256,11 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 	}
 
 	@Override
+	public int getMaxPointers () {
+		return 1;
+	}
+
+	@Override
 	public int getX () {
 		return touchX;
 	}
@@ -288,13 +287,25 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 	}
 
 	@Override
-	public boolean isKeyPressed (int key) {
-		synchronized (this) {
-			if (key == Input.Keys.ANY_KEY)
-				return keys.size() > 0;
-			else
-				return keys.contains(key);
+	public synchronized boolean isKeyPressed (int key) {
+		if (key == Input.Keys.ANY_KEY) {
+			return pressedKeyCount > 0;
 		}
+		if (key < 0 || key > 255) {
+			return false;
+		}
+		return pressedKeys[key];
+	}
+
+	@Override
+	public synchronized boolean isKeyJustPressed (int key) {
+		if (key == Input.Keys.ANY_KEY) {
+			return keyJustPressed;
+		}
+		if (key < 0 || key > 255) {
+			return false;
+		}
+		return justPressedKeys[key];
 	}
 
 	@Override
@@ -310,9 +321,30 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 			return false;
 	}
 
+	@Override
+	public float getPressure () {
+		return getPressure(0);
+	}
+
+	@Override
+	public float getPressure (int pointer) {
+		return isTouched(pointer) ? 1 : 0;
+	}
+
 	void processEvents () {
 		synchronized (this) {
-			justTouched = false;
+			if (justTouched) {
+				justTouched = false;
+				for (int i = 0; i < justPressedButtons.length; i++) {
+					justPressedButtons[i] = false;
+				}
+			}
+			if (keyJustPressed) {
+				keyJustPressed = false;
+				for (int i = 0; i < justPressedKeys.length; i++) {
+					justPressedKeys[i] = false;
+				}
+			}
 
 			if (processor != null) {
 				InputProcessor processor = this.processor;
@@ -324,6 +356,8 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 					switch (e.type) {
 					case KeyEvent.KEY_DOWN:
 						processor.keyDown(e.keyCode);
+						keyJustPressed = true;
+						justPressedKeys[e.keyCode] = true;
 						break;
 					case KeyEvent.KEY_UP:
 						processor.keyUp(e.keyCode);
@@ -342,6 +376,7 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 					case TouchEvent.TOUCH_DOWN:
 						processor.touchDown(e.x, e.y, e.pointer, e.button);
 						justTouched = true;
+						justPressedButtons[e.button] = true;
 						break;
 					case TouchEvent.TOUCH_UP:
 						processor.touchUp(e.x, e.y, e.pointer, e.button);
@@ -353,7 +388,7 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 						processor.mouseMoved(e.x, e.y);
 						break;
 					case TouchEvent.TOUCH_SCROLLED:
-						processor.scrolled(e.scrollAmount);
+						processor.scrolled(0, e.scrollAmount);
 						break;
 					}
 					usedTouchEvents.free(e);
@@ -372,7 +407,7 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 				}
 			}
 
-			if (touchEvents.size() == 0) {
+			if (touchEvents.isEmpty()) {
 				deltaX = 0;
 				deltaY = 0;
 			}
@@ -383,12 +418,27 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 	}
 
 	@Override
-	public void setCatchBackKey (boolean catchBack) {
+	public void setOnscreenKeyboardVisible (boolean visible) {
 
 	}
 
 	@Override
-	public void setOnscreenKeyboardVisible (boolean visible) {
+	public void setOnscreenKeyboardVisible (boolean visible, OnscreenKeyboardType type) {
+
+	}
+
+	@Override
+	public void openTextInputField (NativeInputConfiguration configuration) {
+
+	}
+
+	@Override
+	public void closeTextInputField (boolean sendReturn) {
+
+	}
+
+	@Override
+	public void setKeyboardHeightObserver (KeyboardHeightObserver observer) {
 
 	}
 
@@ -408,7 +458,7 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 			touchX = event.x;
 			touchY = event.y;
 			checkCatched(e);
-			Gdx.graphics.requestRendering();
+			lwjglAwtCanvas.graphics.requestRendering();
 		}
 	}
 
@@ -428,7 +478,7 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 			touchX = event.x;
 			touchY = event.y;
 			checkCatched(e);
-			Gdx.graphics.requestRendering();
+			lwjglAwtCanvas.graphics.requestRendering();
 		}
 	}
 
@@ -441,13 +491,13 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 		touchX = e.getX();
 		touchY = e.getY();
 		checkCatched(e);
-		Gdx.graphics.requestRendering();
+		lwjglAwtCanvas.graphics.requestRendering();
 	}
 
 	@Override
 	public void mouseExited (MouseEvent e) {
 		checkCatched(e);
-		Gdx.graphics.requestRendering();
+		lwjglAwtCanvas.graphics.requestRendering();
 	}
 
 	private void checkCatched (MouseEvent e) {
@@ -485,7 +535,7 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 			touchY = event.y;
 			touchDown = true;
 			pressedButtons.add(event.button);
-			Gdx.graphics.requestRendering();
+			lwjglAwtCanvas.graphics.requestRendering();
 		}
 	}
 
@@ -506,8 +556,8 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 			touchX = event.x;
 			touchY = event.y;
 			pressedButtons.remove(event.button);
-			if (pressedButtons.size() == 0) touchDown = false;
-			Gdx.graphics.requestRendering();
+			if (pressedButtons.size == 0) touchDown = false;
+			lwjglAwtCanvas.graphics.requestRendering();
 		}
 	}
 
@@ -520,7 +570,7 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 			event.scrollAmount = e.getWheelRotation();
 			event.timeStamp = System.nanoTime();
 			touchEvents.add(event);
-			Gdx.graphics.requestRendering();
+			lwjglAwtCanvas.graphics.requestRendering();
 		}
 	}
 
@@ -533,8 +583,11 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 			event.type = KeyEvent.KEY_DOWN;
 			event.timeStamp = System.nanoTime();
 			keyEvents.add(event);
-			keys.add(event.keyCode);
-			Gdx.graphics.requestRendering();
+			if (!pressedKeys[event.keyCode]) {
+				pressedKeyCount++;
+				pressedKeys[event.keyCode] = true;
+			}
+			lwjglAwtCanvas.graphics.requestRendering();
 		}
 	}
 
@@ -547,8 +600,11 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 			event.type = KeyEvent.KEY_UP;
 			event.timeStamp = System.nanoTime();
 			keyEvents.add(event);
-			keys.remove(event.keyCode);
-			Gdx.graphics.requestRendering();
+			if (pressedKeys[event.keyCode]) {
+				pressedKeyCount--;
+				pressedKeys[event.keyCode] = false;
+			}
+			lwjglAwtCanvas.graphics.requestRendering();
 		}
 	}
 
@@ -561,100 +617,233 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 			event.type = KeyEvent.KEY_TYPED;
 			event.timeStamp = System.nanoTime();
 			keyEvents.add(event);
-			Gdx.graphics.requestRendering();
+			lwjglAwtCanvas.graphics.requestRendering();
 		}
 	}
 
-	protected static int translateKeyCode (int keyCode) {
-		if (keyCode == java.awt.event.KeyEvent.VK_ADD) return Input.Keys.PLUS;
-		if (keyCode == java.awt.event.KeyEvent.VK_SUBTRACT) return Input.Keys.MINUS;
-		if (keyCode == java.awt.event.KeyEvent.VK_0) return Input.Keys.NUM_0;
-		if (keyCode == java.awt.event.KeyEvent.VK_1) return Input.Keys.NUM_1;
-		if (keyCode == java.awt.event.KeyEvent.VK_2) return Input.Keys.NUM_2;
-		if (keyCode == java.awt.event.KeyEvent.VK_3) return Input.Keys.NUM_3;
-		if (keyCode == java.awt.event.KeyEvent.VK_4) return Input.Keys.NUM_4;
-		if (keyCode == java.awt.event.KeyEvent.VK_5) return Input.Keys.NUM_5;
-		if (keyCode == java.awt.event.KeyEvent.VK_6) return Input.Keys.NUM_6;
-		if (keyCode == java.awt.event.KeyEvent.VK_7) return Input.Keys.NUM_7;
-		if (keyCode == java.awt.event.KeyEvent.VK_8) return Input.Keys.NUM_8;
-		if (keyCode == java.awt.event.KeyEvent.VK_9) return Input.Keys.NUM_9;
-		if (keyCode == java.awt.event.KeyEvent.VK_A) return Input.Keys.A;
-		if (keyCode == java.awt.event.KeyEvent.VK_B) return Input.Keys.B;
-		if (keyCode == java.awt.event.KeyEvent.VK_C) return Input.Keys.C;
-		if (keyCode == java.awt.event.KeyEvent.VK_D) return Input.Keys.D;
-		if (keyCode == java.awt.event.KeyEvent.VK_E) return Input.Keys.E;
-		if (keyCode == java.awt.event.KeyEvent.VK_F) return Input.Keys.F;
-		if (keyCode == java.awt.event.KeyEvent.VK_G) return Input.Keys.G;
-		if (keyCode == java.awt.event.KeyEvent.VK_H) return Input.Keys.H;
-		if (keyCode == java.awt.event.KeyEvent.VK_I) return Input.Keys.I;
-		if (keyCode == java.awt.event.KeyEvent.VK_J) return Input.Keys.J;
-		if (keyCode == java.awt.event.KeyEvent.VK_K) return Input.Keys.K;
-		if (keyCode == java.awt.event.KeyEvent.VK_L) return Input.Keys.L;
-		if (keyCode == java.awt.event.KeyEvent.VK_M) return Input.Keys.M;
-		if (keyCode == java.awt.event.KeyEvent.VK_N) return Input.Keys.N;
-		if (keyCode == java.awt.event.KeyEvent.VK_O) return Input.Keys.O;
-		if (keyCode == java.awt.event.KeyEvent.VK_P) return Input.Keys.P;
-		if (keyCode == java.awt.event.KeyEvent.VK_Q) return Input.Keys.Q;
-		if (keyCode == java.awt.event.KeyEvent.VK_R) return Input.Keys.R;
-		if (keyCode == java.awt.event.KeyEvent.VK_S) return Input.Keys.S;
-		if (keyCode == java.awt.event.KeyEvent.VK_T) return Input.Keys.T;
-		if (keyCode == java.awt.event.KeyEvent.VK_U) return Input.Keys.U;
-		if (keyCode == java.awt.event.KeyEvent.VK_V) return Input.Keys.V;
-		if (keyCode == java.awt.event.KeyEvent.VK_W) return Input.Keys.W;
-		if (keyCode == java.awt.event.KeyEvent.VK_X) return Input.Keys.X;
-		if (keyCode == java.awt.event.KeyEvent.VK_Y) return Input.Keys.Y;
-		if (keyCode == java.awt.event.KeyEvent.VK_Z) return Input.Keys.Z;
-		if (keyCode == java.awt.event.KeyEvent.VK_ALT) return Input.Keys.ALT_LEFT;
-		if (keyCode == java.awt.event.KeyEvent.VK_ALT_GRAPH) return Input.Keys.ALT_RIGHT;
-		if (keyCode == java.awt.event.KeyEvent.VK_BACK_SLASH) return Input.Keys.BACKSLASH;
-		if (keyCode == java.awt.event.KeyEvent.VK_COMMA) return Input.Keys.COMMA;
-		if (keyCode == java.awt.event.KeyEvent.VK_DELETE) return Input.Keys.DEL;
-		if (keyCode == java.awt.event.KeyEvent.VK_LEFT) return Input.Keys.DPAD_LEFT;
-		if (keyCode == java.awt.event.KeyEvent.VK_RIGHT) return Input.Keys.DPAD_RIGHT;
-		if (keyCode == java.awt.event.KeyEvent.VK_UP) return Input.Keys.DPAD_UP;
-		if (keyCode == java.awt.event.KeyEvent.VK_DOWN) return Input.Keys.DPAD_DOWN;
-		if (keyCode == java.awt.event.KeyEvent.VK_ENTER) return Input.Keys.ENTER;
-		if (keyCode == java.awt.event.KeyEvent.VK_HOME) return Input.Keys.HOME;
-		if (keyCode == java.awt.event.KeyEvent.VK_MINUS) return Input.Keys.MINUS;
-		if (keyCode == java.awt.event.KeyEvent.VK_PERIOD) return Input.Keys.PERIOD;
-		if (keyCode == java.awt.event.KeyEvent.VK_PLUS) return Input.Keys.PLUS;
-		if (keyCode == java.awt.event.KeyEvent.VK_SEMICOLON) return Input.Keys.SEMICOLON;
-		if (keyCode == java.awt.event.KeyEvent.VK_SHIFT) return Input.Keys.SHIFT_LEFT;
-		if (keyCode == java.awt.event.KeyEvent.VK_SLASH) return Input.Keys.SLASH;
-		if (keyCode == java.awt.event.KeyEvent.VK_SPACE) return Input.Keys.SPACE;
-		if (keyCode == java.awt.event.KeyEvent.VK_TAB) return Input.Keys.TAB;
-		if (keyCode == java.awt.event.KeyEvent.VK_BACK_SPACE) return Input.Keys.DEL;
-		if (keyCode == java.awt.event.KeyEvent.VK_CONTROL) return Input.Keys.CONTROL_LEFT;
-		if (keyCode == java.awt.event.KeyEvent.VK_ESCAPE) return Input.Keys.ESCAPE;
-		if (keyCode == java.awt.event.KeyEvent.VK_END) return Input.Keys.END;
-		if (keyCode == java.awt.event.KeyEvent.VK_INSERT) return Input.Keys.INSERT;
-		if (keyCode == java.awt.event.KeyEvent.VK_NUMPAD5) return Input.Keys.DPAD_CENTER;
-		if (keyCode == java.awt.event.KeyEvent.VK_PAGE_UP) return Input.Keys.PAGE_UP;
-		if (keyCode == java.awt.event.KeyEvent.VK_PAGE_DOWN) return Input.Keys.PAGE_DOWN;
-		if (keyCode == java.awt.event.KeyEvent.VK_F1) return Input.Keys.F1;
-		if (keyCode == java.awt.event.KeyEvent.VK_F2) return Input.Keys.F2;
-		if (keyCode == java.awt.event.KeyEvent.VK_F3) return Input.Keys.F3;
-		if (keyCode == java.awt.event.KeyEvent.VK_F4) return Input.Keys.F4;
-		if (keyCode == java.awt.event.KeyEvent.VK_F5) return Input.Keys.F5;
-		if (keyCode == java.awt.event.KeyEvent.VK_F6) return Input.Keys.F6;
-		if (keyCode == java.awt.event.KeyEvent.VK_F7) return Input.Keys.F7;
-		if (keyCode == java.awt.event.KeyEvent.VK_F8) return Input.Keys.F8;
-		if (keyCode == java.awt.event.KeyEvent.VK_F9) return Input.Keys.F9;
-		if (keyCode == java.awt.event.KeyEvent.VK_F10) return Input.Keys.F10;
-		if (keyCode == java.awt.event.KeyEvent.VK_F11) return Input.Keys.F11;
-		if (keyCode == java.awt.event.KeyEvent.VK_F12) return Input.Keys.F12;
-		if (keyCode == java.awt.event.KeyEvent.VK_COLON) return Input.Keys.COLON;
-		if (keyCode == java.awt.event.KeyEvent.VK_NUMPAD0) return Input.Keys.NUM_0;
-		if (keyCode == java.awt.event.KeyEvent.VK_NUMPAD1) return Input.Keys.NUM_1;
-		if (keyCode == java.awt.event.KeyEvent.VK_NUMPAD2) return Input.Keys.NUM_2;
-		if (keyCode == java.awt.event.KeyEvent.VK_NUMPAD3) return Input.Keys.NUM_3;
-		if (keyCode == java.awt.event.KeyEvent.VK_NUMPAD4) return Input.Keys.NUM_4;
-		if (keyCode == java.awt.event.KeyEvent.VK_NUMPAD5) return Input.Keys.NUM_5;
-		if (keyCode == java.awt.event.KeyEvent.VK_NUMPAD6) return Input.Keys.NUM_6;
-		if (keyCode == java.awt.event.KeyEvent.VK_NUMPAD7) return Input.Keys.NUM_7;
-		if (keyCode == java.awt.event.KeyEvent.VK_NUMPAD8) return Input.Keys.NUM_8;
-		if (keyCode == java.awt.event.KeyEvent.VK_NUMPAD9) return Input.Keys.NUM_9;
-
+	protected int translateKeyCode (int keyCode) {
+		switch (keyCode) {
+		case java.awt.event.KeyEvent.VK_0:
+			return Input.Keys.NUM_0;
+		case java.awt.event.KeyEvent.VK_1:
+			return Input.Keys.NUM_1;
+		case java.awt.event.KeyEvent.VK_2:
+			return Input.Keys.NUM_2;
+		case java.awt.event.KeyEvent.VK_3:
+			return Input.Keys.NUM_3;
+		case java.awt.event.KeyEvent.VK_4:
+			return Input.Keys.NUM_4;
+		case java.awt.event.KeyEvent.VK_5:
+			return Input.Keys.NUM_5;
+		case java.awt.event.KeyEvent.VK_6:
+			return Input.Keys.NUM_6;
+		case java.awt.event.KeyEvent.VK_7:
+			return Input.Keys.NUM_7;
+		case java.awt.event.KeyEvent.VK_8:
+			return Input.Keys.NUM_8;
+		case java.awt.event.KeyEvent.VK_9:
+			return Input.Keys.NUM_9;
+		case java.awt.event.KeyEvent.VK_A:
+			return Input.Keys.A;
+		case java.awt.event.KeyEvent.VK_B:
+			return Input.Keys.B;
+		case java.awt.event.KeyEvent.VK_C:
+			return Input.Keys.C;
+		case java.awt.event.KeyEvent.VK_D:
+			return Input.Keys.D;
+		case java.awt.event.KeyEvent.VK_E:
+			return Input.Keys.E;
+		case java.awt.event.KeyEvent.VK_F:
+			return Input.Keys.F;
+		case java.awt.event.KeyEvent.VK_G:
+			return Input.Keys.G;
+		case java.awt.event.KeyEvent.VK_H:
+			return Input.Keys.H;
+		case java.awt.event.KeyEvent.VK_I:
+			return Input.Keys.I;
+		case java.awt.event.KeyEvent.VK_J:
+			return Input.Keys.J;
+		case java.awt.event.KeyEvent.VK_K:
+			return Input.Keys.K;
+		case java.awt.event.KeyEvent.VK_L:
+			return Input.Keys.L;
+		case java.awt.event.KeyEvent.VK_M:
+			return Input.Keys.M;
+		case java.awt.event.KeyEvent.VK_N:
+			return Input.Keys.N;
+		case java.awt.event.KeyEvent.VK_O:
+			return Input.Keys.O;
+		case java.awt.event.KeyEvent.VK_P:
+			return Input.Keys.P;
+		case java.awt.event.KeyEvent.VK_Q:
+			return Input.Keys.Q;
+		case java.awt.event.KeyEvent.VK_R:
+			return Input.Keys.R;
+		case java.awt.event.KeyEvent.VK_S:
+			return Input.Keys.S;
+		case java.awt.event.KeyEvent.VK_T:
+			return Input.Keys.T;
+		case java.awt.event.KeyEvent.VK_U:
+			return Input.Keys.U;
+		case java.awt.event.KeyEvent.VK_V:
+			return Input.Keys.V;
+		case java.awt.event.KeyEvent.VK_W:
+			return Input.Keys.W;
+		case java.awt.event.KeyEvent.VK_X:
+			return Input.Keys.X;
+		case java.awt.event.KeyEvent.VK_Y:
+			return Input.Keys.Y;
+		case java.awt.event.KeyEvent.VK_Z:
+			return Input.Keys.Z;
+		case java.awt.event.KeyEvent.VK_ALT:
+			return Input.Keys.ALT_LEFT;
+		case java.awt.event.KeyEvent.VK_ALT_GRAPH:
+			return Input.Keys.ALT_RIGHT;
+		case java.awt.event.KeyEvent.VK_BACK_SLASH:
+			return Input.Keys.BACKSLASH;
+		case java.awt.event.KeyEvent.VK_COMMA:
+			return Input.Keys.COMMA;
+		case java.awt.event.KeyEvent.VK_DELETE:
+			return Input.Keys.FORWARD_DEL;
+		case java.awt.event.KeyEvent.VK_LEFT:
+			return Input.Keys.DPAD_LEFT;
+		case java.awt.event.KeyEvent.VK_RIGHT:
+			return Input.Keys.DPAD_RIGHT;
+		case java.awt.event.KeyEvent.VK_UP:
+			return Input.Keys.DPAD_UP;
+		case java.awt.event.KeyEvent.VK_DOWN:
+			return Input.Keys.DPAD_DOWN;
+		case java.awt.event.KeyEvent.VK_ENTER:
+			return Input.Keys.ENTER;
+		case java.awt.event.KeyEvent.VK_HOME:
+			return Input.Keys.HOME;
+		case java.awt.event.KeyEvent.VK_MINUS:
+			return Input.Keys.MINUS;
+		case java.awt.event.KeyEvent.VK_SUBTRACT:
+			return Keys.NUMPAD_SUBTRACT;
+		case java.awt.event.KeyEvent.VK_PERIOD:
+			return Input.Keys.PERIOD;
+		case java.awt.event.KeyEvent.VK_PLUS:
+			return Input.Keys.PLUS;
+		case java.awt.event.KeyEvent.VK_ADD:
+			return Keys.NUMPAD_ADD;
+		case java.awt.event.KeyEvent.VK_SEMICOLON:
+			return Input.Keys.SEMICOLON;
+		case java.awt.event.KeyEvent.VK_SHIFT:
+			return Input.Keys.SHIFT_LEFT;
+		case java.awt.event.KeyEvent.VK_SLASH:
+			return Input.Keys.SLASH;
+		case java.awt.event.KeyEvent.VK_SPACE:
+			return Input.Keys.SPACE;
+		case java.awt.event.KeyEvent.VK_TAB:
+			return Input.Keys.TAB;
+		case java.awt.event.KeyEvent.VK_BACK_SPACE:
+			return Input.Keys.DEL;
+		case java.awt.event.KeyEvent.VK_QUOTE:
+			return Input.Keys.APOSTROPHE;
+		case java.awt.event.KeyEvent.VK_ASTERISK:
+			return Input.Keys.STAR;
+		case java.awt.event.KeyEvent.VK_MULTIPLY:
+			return Keys.NUMPAD_MULTIPLY;
+		case java.awt.event.KeyEvent.VK_CONTROL:
+			return Input.Keys.CONTROL_LEFT;
+		case java.awt.event.KeyEvent.VK_ESCAPE:
+			return Input.Keys.ESCAPE;
+		case java.awt.event.KeyEvent.VK_END:
+			return Input.Keys.END;
+		case java.awt.event.KeyEvent.VK_INSERT:
+			return Input.Keys.INSERT;
+		case java.awt.event.KeyEvent.VK_PAGE_UP:
+			return Input.Keys.PAGE_UP;
+		case java.awt.event.KeyEvent.VK_PAGE_DOWN:
+			return Input.Keys.PAGE_DOWN;
+		case java.awt.event.KeyEvent.VK_F1:
+			return Input.Keys.F1;
+		case java.awt.event.KeyEvent.VK_F2:
+			return Input.Keys.F2;
+		case java.awt.event.KeyEvent.VK_F3:
+			return Input.Keys.F3;
+		case java.awt.event.KeyEvent.VK_F4:
+			return Input.Keys.F4;
+		case java.awt.event.KeyEvent.VK_F5:
+			return Input.Keys.F5;
+		case java.awt.event.KeyEvent.VK_F6:
+			return Input.Keys.F6;
+		case java.awt.event.KeyEvent.VK_F7:
+			return Input.Keys.F7;
+		case java.awt.event.KeyEvent.VK_F8:
+			return Input.Keys.F8;
+		case java.awt.event.KeyEvent.VK_F9:
+			return Input.Keys.F9;
+		case java.awt.event.KeyEvent.VK_F10:
+			return Input.Keys.F10;
+		case java.awt.event.KeyEvent.VK_F11:
+			return Input.Keys.F11;
+		case java.awt.event.KeyEvent.VK_F12:
+			return Input.Keys.F12;
+		case java.awt.event.KeyEvent.VK_F13:
+			return Input.Keys.F13;
+		case java.awt.event.KeyEvent.VK_F14:
+			return Input.Keys.F14;
+		case java.awt.event.KeyEvent.VK_F15:
+			return Input.Keys.F15;
+		case java.awt.event.KeyEvent.VK_F16:
+			return Input.Keys.F16;
+		case java.awt.event.KeyEvent.VK_F17:
+			return Input.Keys.F17;
+		case java.awt.event.KeyEvent.VK_F18:
+			return Input.Keys.F18;
+		case java.awt.event.KeyEvent.VK_F19:
+			return Input.Keys.F19;
+		case java.awt.event.KeyEvent.VK_F20:
+			return Input.Keys.F20;
+		case java.awt.event.KeyEvent.VK_F21:
+			return Input.Keys.F21;
+		case java.awt.event.KeyEvent.VK_F22:
+			return Input.Keys.F22;
+		case java.awt.event.KeyEvent.VK_F23:
+			return Input.Keys.F23;
+		case java.awt.event.KeyEvent.VK_F24:
+			return Input.Keys.F24;
+		case java.awt.event.KeyEvent.VK_COLON:
+			return Input.Keys.COLON;
+		case java.awt.event.KeyEvent.VK_NUMPAD0:
+			return Keys.NUMPAD_0;
+		case java.awt.event.KeyEvent.VK_NUMPAD1:
+			return Keys.NUMPAD_1;
+		case java.awt.event.KeyEvent.VK_NUMPAD2:
+			return Keys.NUMPAD_2;
+		case java.awt.event.KeyEvent.VK_NUMPAD3:
+			return Keys.NUMPAD_3;
+		case java.awt.event.KeyEvent.VK_NUMPAD4:
+			return Keys.NUMPAD_4;
+		case java.awt.event.KeyEvent.VK_NUMPAD5:
+			return Keys.NUMPAD_5;
+		case java.awt.event.KeyEvent.VK_NUMPAD6:
+			return Keys.NUMPAD_6;
+		case java.awt.event.KeyEvent.VK_NUMPAD7:
+			return Keys.NUMPAD_7;
+		case java.awt.event.KeyEvent.VK_NUMPAD8:
+			return Keys.NUMPAD_8;
+		case java.awt.event.KeyEvent.VK_NUMPAD9:
+			return Keys.NUMPAD_9;
+		case java.awt.event.KeyEvent.VK_SEPARATOR:
+			return Keys.NUMPAD_COMMA;
+		case java.awt.event.KeyEvent.VK_DECIMAL:
+			return Keys.NUMPAD_DOT;
+		case java.awt.event.KeyEvent.VK_DIVIDE:
+			return Keys.NUMPAD_DIVIDE;
+		case java.awt.event.KeyEvent.VK_NUM_LOCK:
+			return Keys.NUM_LOCK;
+		case java.awt.event.KeyEvent.VK_SCROLL_LOCK:
+			return Keys.SCROLL_LOCK;
+		case java.awt.event.KeyEvent.VK_PRINTSCREEN:
+			return Keys.PRINT_SCREEN;
+		case java.awt.event.KeyEvent.VK_PAUSE:
+			return Keys.PAUSE;
+		case java.awt.event.KeyEvent.VK_CAPS_LOCK:
+			return Keys.CAPS_LOCK;
+		}
 		return Input.Keys.UNKNOWN;
 	}
 
@@ -675,6 +864,18 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 	}
 
 	@Override
+	public void vibrate (int milliseconds, boolean fallback) {
+	}
+
+	@Override
+	public void vibrate (int milliseconds, int amplitude, boolean fallback) {
+	}
+
+	@Override
+	public void vibrate (VibrationType vibrationType) {
+	}
+
+	@Override
 	public boolean justTouched () {
 		return justTouched;
 	}
@@ -685,11 +886,9 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 	}
 
 	@Override
-	public void vibrate (long[] pattern, int repeat) {
-	}
-
-	@Override
-	public void cancelVibrate () {
+	public boolean isButtonJustPressed (int button) {
+		if (button < 0 || button >= justPressedButtons.length) return false;
+		return justPressedButtons[button];
 	}
 
 	@Override
@@ -788,16 +987,6 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 		}
 	}
 
-  @Override
-  public void setCursorImage(Pixmap pixmap, int xHotspot, int yHotspot) {
-  }
-
-  @Override
-	public void setCatchMenuKey (boolean catchMenu) {
-		// TODO Auto-generated method stub
-
-	}
-
 	@Override
 	public long getCurrentEventTime () {
 		return currentEventTimeStamp;
@@ -805,7 +994,20 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 
 	@Override
 	public void getRotationMatrix (float[] matrix) {
-		// TODO Auto-generated method stub
+	}
 
+	@Override
+	public float getGyroscopeX () {
+		return 0;
+	}
+
+	@Override
+	public float getGyroscopeY () {
+		return 0;
+	}
+
+	@Override
+	public float getGyroscopeZ () {
+		return 0;
 	}
 }
